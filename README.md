@@ -4,6 +4,8 @@
 
 纯本地离线运行，不上传任何图片。
 
+**在线版**：仓库 `site/` 内含纯前端网页（官网 + 在线拼豆工具 + 灵感库），部署到 GitHub Pages 的方法见 [GITHUB_PAGES.md](GITHUB_PAGES.md)。
+
 ---
 
 ## 快速开始
