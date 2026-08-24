@@ -1,0 +1,22 @@
+# Python 构建 / 缓存
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec.bak
+
+# 桌面端运行时数据（不入库）
+user_palettes.json
+user_settings.json
+拼豆助手_错误日志.txt
+
+# 灵感库：在线采集的图含版权，仅本地个人使用，不入库
+inspirations/灵感_*
+inspirations/*.jpg
+inspirations/*.jpeg
+inspirations/*.webp
+inspirations/sources.json
+!/site/assets/*.png
+
+# 站点本地测试产物
+site/test_*

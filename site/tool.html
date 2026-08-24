@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>在线拼豆图纸生成 · 拼豆助手</title>
+<meta name="description" content="把照片在线变成拼豆图纸：自动抠图、色卡映射、编号图纸、耗材清单。全部在浏览器本地完成，图片不上传。">
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .toolbar { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; }
+  .panel { background: var(--card); border-radius: 14px; padding: 18px;
+    box-shadow: 0 4px 14px var(--shadow); }
+  .panel h3 { font-size: 15px; margin-bottom: 10px; color: var(--teal); }
+  .panel label { display: block; font-size: 13px; color: var(--ink-soft);
+    margin: 10px 0 4px; }
+  .panel select, .panel input { width: 100%; padding: 7px 9px; border-radius: 8px;
+    border: 1px solid var(--hair); background: var(--paper); font-size: 14px; }
+  .row { display: flex; gap: 10px; align-items: center; }
+  .chk { display: flex; align-items: center; gap: 6px; font-size: 13px;
+    color: var(--ink-soft); margin-top: 12px; }
+  .chk input { width: auto; }
+  #controls { width: 280px; }
+  #preview-box { flex: 1; min-width: 320px; }
+  #drop { border: 2px dashed var(--hair); border-radius: 12px; padding: 26px;
+    text-align: center; color: var(--ink-faint); cursor: pointer;
+    background: var(--paper); transition: .2s; }
+  #drop:hover, #drop.over { border-color: var(--teal); color: var(--teal); }
+  #upload { display: none; }
+  #stage { margin-top: 12px; height: 18px; border-radius: 9px;
+    background: #DCE2EA; overflow: hidden; display: none; }
+  #stage>div { height: 100%; width: 0; background: linear-gradient(90deg,
+    var(--teal), var(--gold)); transition: width .15s; }
+  #canvas-wrap { margin-top: 12px; text-align: center; }
+  #canvas-wrap canvas { max-width: 100%; background: #fff; border-radius: 8px;
+    border: 1px solid var(--hair); }
+  .bthint { font-size: 12px; color: var(--ink-faint); }
+  .btnrow .btn { padding: 10px 18px; font-size: 14px; }
+  .actions { margin-top: 12px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .actions .btn { padding: 9px 16px; font-size: 13px; }
+  #stats { margin-top: 12px; font-size: 13px; color: var(--ink-soft); white-space: pre-line; }
+  a.logo { color:#fff; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <nav>
+      <a class="logo" href="index.html"><span class="dot-heart"></span>拼豆助手</a>
+      <a class="navlink" href="index.html">首页</a>
+      <a class="navlink" href="gallery.html">灵感库</a>
+      <span class="spacer"></span>
+      <a class="cta" href="index.html#download">下载 Windows 版</a>
+    </nav>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div class="toolbar">
+      <div class="panel" id="controls">
+        <h3>① 打开图片</h3>
+        <label id="drop">点击选择 / 拖入一张照片<br><span class="bthint">建议主体清晰、纯色背景；支持 PNG / JPG / WebP</span></label>
+        <input type="file" id="upload" accept="image/png,image/jpeg,image/webp">
+
+        <h3 style="margin-top:16px">② 抠图</h3>
+        <label><input type="radio" name="cut" id="cut-none" checked> 不抠图（整张都用）</label>
+        <label><input type="radio" name="cut" id="cut-auto"> 自动去背景（推荐 · 纯色背景）</label>
+
+        <h3 style="margin-top:12px">③ 底板</h3>
+        <div class="row">
+          <label style="flex:1">宽<input id="cols" type="number" min="8" max="300" value="29"></label>
+          <label style="flex:1">高<input id="rows" type="number" min="8" max="300" value="29"></label>
+        </div>
+        <label><input type="checkbox" id="keepRatio" checked> 按原图比例自动调整高</label>
+
+        <h3 style="margin-top:12px">④ 色卡</h3>
+        <label>色卡
+          <select id="palette">
+            <option>常用40色（泛品牌）</option>
+            <option>进阶78色（泛品牌）</option>
+          </select></label>
+        <div class="row">
+          <label style="flex:1">最多颜色数<input id="maxC" type="number" min="2" max="80" value="12"></label>
+        </div>
+        <label><input type="checkbox" id="fillBlank"> 空白格用白色豆填满</label>
+
+        <div class="actions" style="margin-top:16px">
+          <button class="btn primary" id="gen" disabled>生 成 图 纸</button>
+        </div>
+        <div id="stage"><div></div></div>
+        <div id="stats"></div>
+      </div>
+
+      <div class="panel" id="preview-box">
+        <h3>预览</h3>
+        <div id="canvas-wrap">
+          <p class="bthint" id="hint">上传图片后自动推荐尺寸并生成。</p>
+          <canvas id="view" width="600" height="400"></canvas>
+        </div>
+        <div class="actions">
+          <button class="btn" id="dl-color" disabled>下载图纸 PNG</button>
+          <button class="btn" id="dl-number" disabled>下载编号图 PNG</button>
+          <button class="btn" id="dl-list" disabled>下载耗材清单 txt</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>拼豆助手 · 在线版 · 所有处理均在浏览器本地完成 · 没有任何图片被上传</footer>
+
+<script src="js/app.js"></script>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const state = { mapped: null, cols: 0, rows: 0, used: [], cur: "color", rgHelper: null };
+
+/* 上传 / 拖拽 */
+const drop = $("drop");
+drop.addEventListener("click", () => $("upload").click());
+$("upload").addEventListener("change", e => e.target.files[0] && loadFile(e.target.files[0]));
+["dragover", "drop"].forEach(ev =>
+  drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.toggle("over", ev === "dragover"); }));
+drop.addEventListener("drop", e => e.dataTransfer.files[0] && loadFile(e.dataTransfer.files[0]));
+
+function loadFile(file) {
+  const rd = new FileReader();
+  rd.onload = () => {
+    const im = new Image();
+    im.onload = () => setupImage(im);
+    im.src = rd.result;
+  };
+  rd.readAsDataURL(file);
+}
+
+let srcRGB = null, srcW = 0, srcH = 0;   // 原图（做过可选抠图的）RGBA 缓存
+function setupImage(im) {
+  const MAX = 1400;
+  let scale = Math.min(1, MAX / Math.max(im.width, im.height));
+  srcW = Math.round(im.width * scale); srcH = Math.round(im.height * scale);
+  const cv = document.createElement("canvas");
+  cv.width = srcW; cv.height = srcH;
+  const ctx = cv.getContext("2d");
+  ctx.drawImage(im, 0, 0, srcW, srcH);
+  srcRGB = ctx.getImageData(0, 0, srcW, srcH).data;
+  // 推荐尺寸
+  const ratio = srcW / srcH;
+  const base = ratio >= 1 ? 45 : 45;
+  let cols = 45, rows = 45;
+  if (ratio >= 1) { cols = 45; rows = Math.max(8, Math.round(45 / ratio)); }
+  else { rows = 45; cols = Math.max(8, Math.round(45 * ratio)); }
+  $("cols").value = cols; $("rows").value = rows;
+  $("gen").disabled = false;
+  $("hint").innerHTML = `原图 ${srcW}×${srcH}，已按比例推荐 ${cols}×${rows}，可自行调整后再生成。`;
+  showHint();
+}
+
+/* 进度条 */
+function setProgress(p) {
+  const st = $("stage"); const bar = st.firstElementChild;
+  st.style.display = p > 0 ? "block" : "none";
+  bar.style.width = Math.round(p * 100) + "%";
+}
+
+function showHint() {
+  const c = $("view");
+  const ctx = c.getContext("2d");
+  ctx.clearRect(0, 0, c.width, c.height);
+  ctx.fillStyle = "#EDF0F4"; ctx.fillRect(0, 0, c.width, c.height);
+  ctx.fillStyle = "#9AA4B2"; ctx.font = "15px 'Microsoft YaHei', sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("← 上传一张照片，点「生成图纸」", c.width / 2, c.height / 2 - 10);
+  ctx.fillStyle = "#C3CBD6";
+  ctx.fillText("示例输出：颜色图纸 + 编号图纸 + 耗材清单，可下载 PNG", c.width / 2, c.height / 2 + 20);
+}
+
+/* 生成 */
+$("gen").addEventListener("click", async () => {
+  if (!srcRGB) return;
+  const keepRatio = $("keepRatio").checked;
+  let cols = parseInt($("cols").value) || 29;
+  let rows = parseInt($("rows").value) || 29;
+  if (keepRatio) rows = Math.max(2, Math.round(cols * srcH / srcW));
+  $("rows").value = rows;
+  const opts = {
+    data: srcRGB, w: srcW, h: srcH,
+    cols, rows,
+    palette: PALETTES[$("palette").value] || COMMON_COLORS,
+    maxColors: parseInt($("maxC").value) || 12,
+    fillBlank: $("fillBlank").checked,
+    removeBg: $("cut-auto").checked,
+  };
+  $("gen").disabled = true;
+  try {
+    const res = await generate(opts, (phase, p) => setProgress(phase ? .55 + p * .45 : p * .55));
+    renderResult(res, cols, rows);
+  } catch (e) {
+    setProgress(0); alert("生成失败：" + e.message);
+  } finally { $("gen").disabled = false; setProgress(1); }
+});
+
+function renderResult(res, cols, rows) {
+  state.mapped = res.mapped; state.cols = cols; state.rows = rows;
+  state.used = res.used;
+  const total = res.used.reduce((s, u) => s + u.cnt, 0);
+  $("stats").textContent =
+`图纸尺寸：${cols} × ${rows}    用色：${res.used.length} 种    共需：${total} 颗豆${res.used.length ? "\n用豆最多：" + res.used.slice(0, 3).map(u => u.name + "(" + u.cnt + ")").join("、") : ""}`;
+  state.cur = "color";
+  drawView();
+  ["dl-color", "dl-number", "dl-list"].forEach(id => $(id).disabled = false);
+  setProgress(1);
+}
+
+function drawView() {
+  const numMap = {};
+  state.used.forEach((u, i) => numMap[u.name] = i + 1);
+  const cv = drawPattern(state.mapped, state.cols, state.rows, 16,
+    true, state.cur === "number", numMap);
+  const view = $("view");
+  // 等比例适配显示
+  const scale = Math.min(view.width / cv.width, view.height / cv.height);
+  const ctx = view.getContext("2d");
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, view.width, view.height);
+  ctx.drawImage(cv, (view.width - cv.width * scale) / 2,
+    (view.height - cv.height * scale) / 2,
+    cv.width * scale, cv.height * scale);
+  state._lastGrid = cv;
+}
+
+/* 下载 */
+$("dl-color").addEventListener("click", () => {
+  const sheet = drawSheet(state.mapped, state.cols, state.rows, state.used, "color");
+  downloadCanvas(sheet, `拼豆图纸_${state.cols}x${state.rows}.png`);
+});
+$("dl-number").addEventListener("click", () => {
+  const sheet = drawSheet(state.mapped, state.cols, state.rows, state.used, "number");
+  downloadCanvas(sheet, `拼豆编号图_${state.cols}x${state.rows}.png`);
+});
+$("dl-list").addEventListener("click", () =>
+  downloadList(state.used, state.cols, state.rows));
+
+/* 尺寸改变时若已有结果自动重生成 */
+["cols", "rows", "maxC", "palette", "fillBlank", "cut-auto"].forEach(id => {
+  $(id).addEventListener(id === "cols" || id === "rows" ? "change" : "change",
+    () => { if (state.mapped) $("gen").click(); });
+});
+$("keepRatio").addEventListener("change", () => {
+  if (state.mapped) { $("gen").click(); }
+});
+showHint();
+</script>
+</body>
+</html>

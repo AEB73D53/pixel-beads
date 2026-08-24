@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>拼豆助手 · 照片变拼豆图纸</title>
+<meta name="description" content="把一张照片变成可以直接照着拼的拼豆图纸：自动抠图、色卡映射、编号图纸、耗材清单。纯本地处理，不上传图片。">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <nav>
+      <span class="logo"><span class="dot-heart"></span>拼豆助手
+        <small>照片 → 拼豆图纸</small></span>
+      <a class="navlink" href="#features">特性</a>
+      <a class="navlink" href="#how">怎么用</a>
+      <a class="navlink" href="gallery.html">灵感库</a>
+      <span class="spacer"></span>
+      <a class="cta" href="tool.html">开始拼豆 →</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <h1>把一张照片，变成<b>照着拼</b>的拼豆图纸</h1>
+    <p class="sub">自动抠背景 · 像素网格化 · 智能色卡匹配（K-Means + 感知色差）<br>
+      <b>产出编号图纸 + 耗材清单</b>，打开就能照着拼。纯本地处理，图片不上传。</p>
+    <div class="btnrow">
+      <a class="btn primary" href="tool.html">在线使用（免费）</a>
+      <a class="btn ghost" href="#download">下载 Windows 版</a>
+    </div>
+    <div class="hero-pic">
+      <img src="assets/sample_t1.png" alt="拼豆图纸示例：颜色格子图 + 图例">
+      <img src="assets/sample_number.png" alt="拼豆图纸示例：编号图">
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <h2>一张照片 → 能直接开工的图纸</h2>
+    <p class="lead">不需要任何手动描点，全自动完成传统拼豆图纸的制作步骤</p>
+    <div class="cards">
+      <div class="card"><div class="emoji">🔒</div><h3>本地处理 · 隐私安全</h3>
+        <p>所有计算都在你的电脑 / 浏览器本地完成，照片永远不会上传服务器。</p></div>
+      <div class="card"><div class="emoji">✂️</div><h3>智能抠图</h3>
+        <p>纯色背景自动透明化（CIELAB 感知色差）；复杂背景可手动框选主体。</p></div>
+      <div class="card"><div class="emoji">🎨</div><h3>感知色卡还原</h3>
+        <p>40 / 78 色泛品牌色卡，K-Means + 一对一贪心选色，用最少种类还原最多细节。</p></div>
+      <div class="card"><div class="emoji">🤏</div><h3>一颗不多一颗不少</h3>
+        <p>编号图 + 每色颗数清单，买豆、对色、验收都靠它。</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <h2>三步出一张图纸</h2>
+    <p class="lead">网页版与 Windows 版操作一致</p>
+    <div class="steps">
+      <div class="step"><span class="n">1</span><h4>打开照片</h4>
+        <p>选一张主体清晰、纯色背景更佳的照片，自动推荐等比例尺寸。</p></div>
+      <div class="step"><span class="n">2</span><h4>调整参数生成</h4>
+        <p>选色卡、定网格大小与最多颜色数，点一下即出颜色图纸与编号图纸。</p></div>
+      <div class="step"><span class="n">3</span><h4>导出开工</h4>
+        <p>保存图纸 PNG（可打印）与耗材清单 txt，照着编号拼豆。</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="download" class="download">
+  <div class="wrap">
+    <h2>Windows 桌面版 · 免费下载</h2>
+    <p class="lead">功能与网页版一致，另支持 PDF / Excel 导出、拼豆灵感库、离线去背景</p>
+    <div class="btnrow"><a class="btn primary" id="dl-btn" href="#download">下载 拼豆助手.exe</a></div>
+    <div class="badges"><span>Windows</span><span>单文件免安装</span><span>约 79 MB</span></div>
+    <p class="note">下载按钮指向 GitHub Releases 发布资产；更新版本在 Releases 页查看。<br id="dl-hint" style="display:none">已接入最新版本（v2.0）。</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>灵感没头绪？</h2>
+    <p class="lead">去灵感库看看出图效果，或到小红书搜索 #拼豆图纸 找参考</p>
+    <div class="btnrow"><a class="btn ghost" href="gallery.html">打开灵感库</a></div>
+  </div>
+</section>
+
+<footer>
+  拼豆助手 · 开源示例项目 · 官网由 GitHub Pages 托管，本站无任何图片上传/服务端数据
+</footer>
+
+</body>
+</html>

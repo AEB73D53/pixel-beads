@@ -1,0 +1,98 @@
+/* 拼豆助手 · 官网样式 —— 现代拟态风（与桌面版一致） */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #EDF0F4; --card: #F5F7FA; --paper: #FFFFFF;
+  --ink: #2B3440; --ink-soft: #6B7686; --ink-faint: #9AA4B2;
+  --bead: #E8483A; --bead-dark: #C93629; --teal: #2E8C83; --gold: #E8A33D;
+  --shadow: rgba(43, 52, 64, .12); --hair: #D5DBE3;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--ink);
+  font-family: "Segoe UI", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+  line-height: 1.6; -webkit-font-smoothing: antialiased; }
+a { color: var(--teal); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+
+/* 头部 */
+header { background: var(--ink); position: sticky; top: 0; z-index: 50; }
+nav { display: flex; align-items: center; gap: 22px; height: 62px; }
+.logo { display: flex; align-items: center; gap: 10px; color: #fff;
+  font-weight: 700; font-size: 17px; }
+.logo small { color: var(--ink-soft); font-weight: 400; }
+.dot-heart { width: 26px; height: 26px; border-radius: 7px;
+  background: linear-gradient(135deg, var(--bead), var(--bead-dark));
+  position: relative; }
+.dot-heart::after { content: "豆"; position: absolute; inset: 0;
+  display: grid; place-items: center; color: #fff; font-size: 13px; }
+nav a.navlink { color: #C3CBD6; font-size: 14px; }
+nav a.navlink:hover { color: #fff; text-decoration: none; }
+nav .spacer { flex: 1; }
+nav .cta { background: var(--bead); color: #fff !important; padding: 7px 16px;
+  border-radius: 24px; font-size: 14px; font-weight: 600; }
+nav .cta:hover { background: var(--bead-dark); text-decoration: none; }
+
+/* Hero */
+.hero { padding: 64px 0 54px; text-align: center; }
+.hero h1 { font-size: 42px; letter-spacing: 1px; }
+.hero .sub { color: var(--ink-soft); font-size: 17px; margin: 14px 0 30px; }
+.btnrow { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+.btn { display: inline-block; padding: 13px 30px; border-radius: 26px;
+  font-size: 16px; font-weight: 600; cursor: pointer; border: none; }
+.btn.primary { background: var(--bead); color: #fff; }
+.btn.primary:hover { background: var(--bead-dark); text-decoration: none; }
+.btn.ghost { background: var(--card); color: var(--ink);
+  box-shadow: 0 1px 3px var(--shadow); }
+.btn.ghost:hover { background: #fff; text-decoration: none; }
+.hero-pic { margin-top: 38px; display: flex; justify-content: center; gap: 16px;
+  flex-wrap: wrap; }
+.hero-pic img { max-width: 380px; width: 100%; border-radius: 14px;
+  box-shadow: 0 12px 34px var(--shadow); border: 1px solid var(--hair); }
+
+/* 区块 */
+section { padding: 46px 0; }
+section h2 { font-size: 26px; text-align: center; margin-bottom: 8px; }
+section .lead { text-align: center; color: var(--ink-soft); margin-bottom: 30px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px; }
+.card { background: var(--card); border-radius: 14px; padding: 22px;
+  box-shadow: 0 4px 14px var(--shadow); border: 1px solid rgba(255,255,255,.6); }
+.card h3 { font-size: 16px; margin-bottom: 8px; }
+.card p { color: var(--ink-soft); font-size: 14px; }
+.emoji { font-size: 26px; line-height: 1; }
+
+/* 步骤 */
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 18px; }
+.step { background: var(--card); border-radius: 14px; padding: 22px;
+  position: relative; box-shadow: 0 4px 14px var(--shadow); }
+.step .n { position: absolute; top: 14px; right: 18px; color: var(--ink-faint);
+  font-size: 30px; font-weight: 800; }
+.step h4 { margin-bottom: 6px; }
+.step p { color: var(--ink-soft); font-size: 14px; }
+
+/* 下载 */
+.download { background: var(--ink); color: #fff; text-align: center; }
+.download h2 { color: #fff; }
+.download .lead { color: var(--ink-soft); }
+.badges { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;
+  margin-top: 6px; }
+.badges span { background: rgba(255,255,255,.08); padding: 5px 12px;
+  border-radius: 20px; font-size: 12px; color: #C3CBD6; }
+.note { margin-top: 14px; color: var(--ink-soft); font-size: 13px; }
+
+/* 灵感库 */
+.pics { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px; }
+.pics figure { background: var(--card); border-radius: 14px; padding: 12px;
+  box-shadow: 0 4px 14px var(--shadow); }
+.pics img { width: 100%; border-radius: 8px; border: 1px solid var(--hair); }
+.pics figcaption { font-size: 13px; color: var(--ink-soft); padding: 8px 2px 2px; }
+
+footer { padding: 30px 0; text-align: center; color: var(--ink-faint);
+  font-size: 13px; }
+
+@media (max-width: 640px) {
+  .hero h1 { font-size: 30px; }
+  nav .navlink, .logo small { display: none; }
+}
