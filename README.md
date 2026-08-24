@@ -73,15 +73,19 @@ python gui.py
 
 ```
 拼豆工具/
-├── gui.py             # 桌面图形界面（入口）
-├── bead_engine.py     # 图片处理引擎：抠图 / 网格化 / 色卡映射 / 图纸渲染
-├── inspirations.py    # 拼豆灵感：内置精选生成 + 在线采集（Bing 直链/来源记录）
-├── palettes.py        # 拼豆色卡数据 + 用户色卡持久化/导入
-├── app.ico            # 应用图标
-├── inspirations/      # 灵感库：采集/导入的参考图 + sources.json 来源记录
-├── user_palettes.json # （运行后生成）自定义颜色与色卡
-├── user_settings.json # （运行后生成）记住上次设置
-└── dist/拼豆助手.exe   # 打包好的单文件程序
+├── .github/workflows/pages.yml   # 把 site/ 自动发布到 GitHub Pages
+├── site/                         # 在线版：官网 + 在线拼豆工具 + 灵感库（纯静态）
+├── testdata/                     # 内部测试用样例图
+├── gui.py                        # 桌面图形界面（入口）
+├── bead_engine.py                # 图片处理引擎：抠图 / 网格化 / 色卡映射 / 图纸渲染
+├── inspirations.py               # 拼豆灵感：本地灵感库 + 在线采集（Bing 直链/来源记录）
+├── palettes.py                   # 拼豆色卡数据 + 用户色卡持久化/导入
+├── app.ico                       # 应用图标
+├── inspirations/                 # （运行时）灵感库：采集/导入的参考图 + 来源记录
+├── user_palettes.json            # （运行时生成）自定义颜色与色卡
+├── user_settings.json            # （运行时生成）记住上次设置
+├── GITHUB_PAGES.md               # GitHub Pages 部署指南
+└── dist/拼豆助手.exe              # 打包好的单文件程序
 ```
 
 ## 技术说明
