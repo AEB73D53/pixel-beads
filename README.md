@@ -1,8 +1,8 @@
-# 拼豆助手（Photo-to-Pattern）
+# BeadCraft · 拼豆助手（Photo-to-Pattern）
 
-把一张照片变成可以直接照着拼的 **拼豆图纸**：自动抠掉背景 → 转成像素格 → 映射到拼豆色卡 → 输出**图纸图 + 耗材清单**。
+**Turn any photo into a printable perler-bead pattern** — automatic background removal → pixel grid → palette quantization → numbered chart + shopping list. 100% local, no upload.
 
-纯本地离线运行，不上传任何图片。
+**把一张照片变成可以直接照着拼的拼豆图纸**：自动抠掉背景 → 转成像素格 → 映射到拼豆色卡 → 输出**图纸图 + 耗材清单**。纯本地离线运行，不上传任何图片。
 
 **在线版**：仓库 `site/` 内含纯前端网页（官网 + 在线拼豆工具 + 灵感库），部署到 GitHub Pages 的方法见 [GITHUB_PAGES.md](GITHUB_PAGES.md)。
 

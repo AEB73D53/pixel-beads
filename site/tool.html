@@ -3,36 +3,28 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>在线拼豆图纸生成 · 拼豆助手</title>
-<meta name="description" content="把照片在线变成拼豆图纸：自动抠图、色卡映射、编号图纸、耗材清单。全部在浏览器本地完成，图片不上传。">
+<title data-lang="zh">在线拼豆图纸生成 · 拼豆助手</title>
+<title data-lang="en" style="display:none">Online Perler-Bead Pattern Generator · BeadCraft</title>
+<meta name="description" content="Turn any photo into a perler-bead pattern online: auto cutout, palette mapping, numbered chart, shopping list. All in-browser, nothing uploaded. / 在线把照片变成拼豆图纸，纯浏览器本地计算。">
 <link rel="stylesheet" href="css/style.css">
 <style>
   .toolbar { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; }
-  .panel { background: var(--card); border-radius: 14px; padding: 18px;
-    box-shadow: 0 4px 14px var(--shadow); }
+  .panel { background: var(--card); border-radius: 14px; padding: 18px; box-shadow: 0 4px 14px var(--shadow); }
   .panel h3 { font-size: 15px; margin-bottom: 10px; color: var(--teal); }
-  .panel label { display: block; font-size: 13px; color: var(--ink-soft);
-    margin: 10px 0 4px; }
-  .panel select, .panel input { width: 100%; padding: 7px 9px; border-radius: 8px;
-    border: 1px solid var(--hair); background: var(--paper); font-size: 14px; }
+  .panel label { display: block; font-size: 13px; color: var(--ink-soft); margin: 10px 0 4px; }
+  .panel select, .panel input { width: 100%; padding: 7px 9px; border-radius: 8px; border: 1px solid var(--hair); background: var(--paper); font-size: 14px; }
   .row { display: flex; gap: 10px; align-items: center; }
-  .chk { display: flex; align-items: center; gap: 6px; font-size: 13px;
-    color: var(--ink-soft); margin-top: 12px; }
+  .chk { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-soft); margin-top: 12px; }
   .chk input { width: auto; }
   #controls { width: 280px; }
   #preview-box { flex: 1; min-width: 320px; }
-  #drop { border: 2px dashed var(--hair); border-radius: 12px; padding: 26px;
-    text-align: center; color: var(--ink-faint); cursor: pointer;
-    background: var(--paper); transition: .2s; }
+  #drop { border: 2px dashed var(--hair); border-radius: 12px; padding: 26px; text-align: center; color: var(--ink-faint); cursor: pointer; background: var(--paper); transition: .2s; }
   #drop:hover, #drop.over { border-color: var(--teal); color: var(--teal); }
   #upload { display: none; }
-  #stage { margin-top: 12px; height: 18px; border-radius: 9px;
-    background: #DCE2EA; overflow: hidden; display: none; }
-  #stage>div { height: 100%; width: 0; background: linear-gradient(90deg,
-    var(--teal), var(--gold)); transition: width .15s; }
+  #stage { margin-top: 12px; height: 18px; border-radius: 9px; background: #DCE2EA; overflow: hidden; display: none; }
+  #stage>div { height: 100%; width: 0; background: linear-gradient(90deg, var(--teal), var(--gold)); transition: width .15s; }
   #canvas-wrap { margin-top: 12px; text-align: center; }
-  #canvas-wrap canvas { max-width: 100%; background: #fff; border-radius: 8px;
-    border: 1px solid var(--hair); }
+  #canvas-wrap canvas { max-width: 100%; background: #fff; border-radius: 8px; border: 1px solid var(--hair); }
   .bthint { font-size: 12px; color: var(--ink-faint); }
   .btnrow .btn { padding: 10px 18px; font-size: 14px; }
   .actions { margin-top: 12px; display: flex; gap: 10px; flex-wrap: wrap; }
@@ -46,11 +38,21 @@
 <header>
   <div class="wrap">
     <nav>
-      <a class="logo" href="index.html"><span class="dot-heart"></span>拼豆助手</a>
-      <a class="navlink" href="index.html">首页</a>
-      <a class="navlink" href="gallery.html">灵感库</a>
+      <a class="logo" href="index.html"><span class="dot-heart"></span>BeadCraft</a>
+      <a class="navlink" href="index.html" data-lang="zh">首页</a>
+      <a class="navlink" href="index.html" data-lang="en" style="display:none">Home</a>
+      <a class="navlink" href="gallery.html" data-lang="zh">灵感库</a>
+      <a class="navlink" href="gallery.html" data-lang="en" style="display:none">Gallery</a>
       <span class="spacer"></span>
-      <a class="cta" href="index.html#download">下载 Windows 版</a>
+      <a class="cta" href="index.html#download" data-lang="zh">下载 Windows 版</a>
+      <a class="cta" href="index.html#download" data-lang="en" style="display:none">Download for Windows</a>
+      <span class="lang-sel" id="langSel">
+        <button onclick="toggleLang()" id="langBtn">🌐 中文</button>
+        <div class="drop">
+          <a href="#" onclick="setLang('zh');return false">中文</a>
+          <a href="#" onclick="setLang('en');return false">English</a>
+        </div>
+      </span>
     </nav>
   </div>
 </header>
@@ -59,62 +61,91 @@
   <div class="wrap">
     <div class="toolbar">
       <div class="panel" id="controls">
-        <h3>① 打开图片</h3>
-        <label id="drop">点击选择 / 拖入一张照片<br><span class="bthint">建议主体清晰、纯色背景；支持 PNG / JPG / WebP</span></label>
+        <h3 data-lang="zh">① 打开图片</h3>
+        <h3 data-lang="en" style="display:none">① Open a Photo</h3>
+        <label id="drop" data-lang="zh">点击选择 / 拖入一张照片<br><span class="bthint">建议主体清晰、纯色背景；支持 PNG / JPG / WebP</span></label>
+        <label id="drop" data-lang="en" style="display:none">Click or drag & drop a photo<br><span class="bthint">Clear subject, solid background recommended. Supports PNG / JPG / WebP</span></label>
         <input type="file" id="upload" accept="image/png,image/jpeg,image/webp">
 
-        <h3 style="margin-top:16px">② 抠图</h3>
-        <label><input type="radio" name="cut" id="cut-none" checked> 不抠图（整张都用）</label>
-        <label><input type="radio" name="cut" id="cut-auto"> 自动去背景（推荐 · 纯色背景）</label>
+        <h3 style="margin-top:16px" data-lang="zh">② 抠图</h3>
+        <h3 style="margin-top:16px" data-lang="en" style="display:none">② Cutout</h3>
+        <label><input type="radio" name="cut" id="cut-none" checked> <span data-lang="zh">不抠图（整张都用）</span><span data-lang="en" style="display:none">No cutout (use whole image)</span></label>
+        <label><input type="radio" name="cut" id="cut-auto"> <span data-lang="zh">自动去背景（推荐 · 纯色背景）</span><span data-lang="en" style="display:none">Auto remove background (recommended for solid backgrounds)</span></label>
 
-        <h3 style="margin-top:12px">③ 底板</h3>
+        <h3 style="margin-top:12px" data-lang="zh">③ 底板</h3>
+        <h3 style="margin-top:12px" data-lang="en" style="display:none">③ Canvas</h3>
         <div class="row">
-          <label style="flex:1">宽<input id="cols" type="number" min="8" max="300" value="29"></label>
-          <label style="flex:1">高<input id="rows" type="number" min="8" max="300" value="29"></label>
+          <label style="flex:1"><span data-lang="zh">宽</span><span data-lang="en" style="display:none">Width</span><input id="cols" type="number" min="8" max="300" value="29"></label>
+          <label style="flex:1"><span data-lang="zh">高</span><span data-lang="en" style="display:none">Height</span><input id="rows" type="number" min="8" max="300" value="29"></label>
         </div>
-        <label><input type="checkbox" id="keepRatio" checked> 按原图比例自动调整高</label>
+        <label><input type="checkbox" id="keepRatio" checked> <span data-lang="zh">按原图比例自动调整高</span><span data-lang="en" style="display:none">Auto-calculate height from aspect ratio</span></label>
 
-        <h3 style="margin-top:12px">④ 色卡</h3>
-        <label>色卡
+        <h3 style="margin-top:12px" data-lang="zh">④ 色卡</h3>
+        <h3 style="margin-top:12px" data-lang="en" style="display:none">④ Palette</h3>
+        <label><span data-lang="zh">色卡</span><span data-lang="en" style="display:none">Palette</span>
           <select id="palette">
             <option>常用40色（泛品牌）</option>
             <option>进阶78色（泛品牌）</option>
           </select></label>
         <div class="row">
-          <label style="flex:1">最多颜色数<input id="maxC" type="number" min="2" max="80" value="12"></label>
+          <label style="flex:1"><span data-lang="zh">最多颜色数</span><span data-lang="en" style="display:none">Max colors</span><input id="maxC" type="number" min="2" max="80" value="12"></label>
         </div>
-        <label><input type="checkbox" id="fillBlank"> 空白格用白色豆填满</label>
+        <label><input type="checkbox" id="fillBlank"> <span data-lang="zh">空白格用白色豆填满</span><span data-lang="en" style="display:none">Fill blank cells with white beads</span></label>
 
         <div class="actions" style="margin-top:16px">
-          <button class="btn primary" id="gen" disabled>生 成 图 纸</button>
+          <button class="btn primary" id="gen" disabled><span data-lang="zh">生 成 图 纸</span><span data-lang="en" style="display:none">Generate Pattern</span></button>
         </div>
         <div id="stage"><div></div></div>
         <div id="stats"></div>
       </div>
 
       <div class="panel" id="preview-box">
-        <h3>预览</h3>
+        <h3 data-lang="zh">预览</h3>
+        <h3 data-lang="en" style="display:none">Preview</h3>
         <div id="canvas-wrap">
-          <p class="bthint" id="hint">上传图片后自动推荐尺寸并生成。</p>
+          <p class="bthint" id="hint" data-lang="zh">上传图片后自动推荐尺寸并生成。</p>
+          <p class="bthint" id="hint" data-lang="en" style="display:none">Upload a photo to auto-suggest dimensions and generate.</p>
           <canvas id="view" width="600" height="400"></canvas>
         </div>
         <div class="actions">
-          <button class="btn" id="dl-color" disabled>下载图纸 PNG</button>
-          <button class="btn" id="dl-number" disabled>下载编号图 PNG</button>
-          <button class="btn" id="dl-list" disabled>下载耗材清单 txt</button>
+          <button class="btn" id="dl-color" disabled><span data-lang="zh">下载图纸 PNG</span><span data-lang="en" style="display:none">Download Pattern PNG</span></button>
+          <button class="btn" id="dl-number" disabled><span data-lang="zh">下载编号图 PNG</span><span data-lang="en" style="display:none">Download Numbered Chart PNG</span></button>
+          <button class="btn" id="dl-list" disabled><span data-lang="zh">下载耗材清单 txt</span><span data-lang="en" style="display:none">Download Shopping List txt</span></button>
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<footer>拼豆助手 · 在线版 · 所有处理均在浏览器本地完成 · 没有任何图片被上传</footer>
+<footer>
+  <span data-lang="zh">BeadCraft · 拼豆助手 · 在线版 · 所有处理均在浏览器本地完成 · 没有任何图片被上传</span>
+  <span data-lang="en" style="display:none">BeadCraft · Online tool · All processing happens in your browser · Nothing is uploaded</span>
+</footer>
 
 <script src="js/app.js"></script>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
 const state = { mapped: null, cols: 0, rows: 0, used: [], cur: "color", rgHelper: null };
+
+/* 语言切换 */
+const LANG_KEY = "beadcraft_lang";
+function setLang(lang) {
+  document.querySelectorAll("[data-lang]").forEach(el => {
+    el.style.display = el.getAttribute("data-lang") === lang ? "" : "none";
+  });
+  document.getElementById("langBtn").textContent = lang === "zh" ? "🌐 中文" : "🌐 EN";
+  document.querySelector("html").lang = lang === "zh" ? "zh-CN" : "en";
+  localStorage.setItem(LANG_KEY, lang);
+  document.getElementById("langSel").classList.remove("open");
+}
+function toggleLang() { document.getElementById("langSel").classList.toggle("open"); }
+document.addEventListener("click", function(e) {
+  const sel = document.getElementById("langSel");
+  if (!sel.contains(e.target)) sel.classList.remove("open");
+});
+const saved = localStorage.getItem(LANG_KEY) || "zh";
+setLang(saved);
 
 /* 上传 / 拖拽 */
 const drop = $("drop");
@@ -134,7 +165,7 @@ function loadFile(file) {
   rd.readAsDataURL(file);
 }
 
-let srcRGB = null, srcW = 0, srcH = 0;   // 原图（做过可选抠图的）RGBA 缓存
+let srcRGB = null, srcW = 0, srcH = 0;
 function setupImage(im) {
   const MAX = 1400;
   let scale = Math.min(1, MAX / Math.max(im.width, im.height));
@@ -144,9 +175,7 @@ function setupImage(im) {
   const ctx = cv.getContext("2d");
   ctx.drawImage(im, 0, 0, srcW, srcH);
   srcRGB = ctx.getImageData(0, 0, srcW, srcH).data;
-  // 推荐尺寸
   const ratio = srcW / srcH;
-  const base = ratio >= 1 ? 45 : 45;
   let cols = 45, rows = 45;
   if (ratio >= 1) { cols = 45; rows = Math.max(8, Math.round(45 / ratio)); }
   else { rows = 45; cols = Math.max(8, Math.round(45 * ratio)); }
@@ -156,7 +185,6 @@ function setupImage(im) {
   showHint();
 }
 
-/* 进度条 */
 function setProgress(p) {
   const st = $("stage"); const bar = st.firstElementChild;
   st.style.display = p > 0 ? "block" : "none";
@@ -175,7 +203,6 @@ function showHint() {
   ctx.fillText("示例输出：颜色图纸 + 编号图纸 + 耗材清单，可下载 PNG", c.width / 2, c.height / 2 + 20);
 }
 
-/* 生成 */
 $("gen").addEventListener("click", async () => {
   if (!srcRGB) return;
   const keepRatio = $("keepRatio").checked;
@@ -195,9 +222,8 @@ $("gen").addEventListener("click", async () => {
   try {
     const res = await generate(opts, (phase, p) => setProgress(phase ? .55 + p * .45 : p * .55));
     renderResult(res, cols, rows);
-  } catch (e) {
-    setProgress(0); alert("生成失败：" + e.message);
-  } finally { $("gen").disabled = false; setProgress(1); }
+  } catch (e) { setProgress(0); alert("生成失败 / Generation failed: " + e.message); }
+  finally { $("gen").disabled = false; setProgress(1); }
 });
 
 function renderResult(res, cols, rows) {
@@ -215,20 +241,15 @@ function renderResult(res, cols, rows) {
 function drawView() {
   const numMap = {};
   state.used.forEach((u, i) => numMap[u.name] = i + 1);
-  const cv = drawPattern(state.mapped, state.cols, state.rows, 16,
-    true, state.cur === "number", numMap);
+  const cv = drawPattern(state.mapped, state.cols, state.rows, 16, true, state.cur === "number", numMap);
   const view = $("view");
-  // 等比例适配显示
   const scale = Math.min(view.width / cv.width, view.height / cv.height);
   const ctx = view.getContext("2d");
   ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, view.width, view.height);
-  ctx.drawImage(cv, (view.width - cv.width * scale) / 2,
-    (view.height - cv.height * scale) / 2,
-    cv.width * scale, cv.height * scale);
+  ctx.drawImage(cv, (view.width - cv.width * scale) / 2, (view.height - cv.height * scale) / 2, cv.width * scale, cv.height * scale);
   state._lastGrid = cv;
 }
 
-/* 下载 */
 $("dl-color").addEventListener("click", () => {
   const sheet = drawSheet(state.mapped, state.cols, state.rows, state.used, "color");
   downloadCanvas(sheet, `拼豆图纸_${state.cols}x${state.rows}.png`);
@@ -237,17 +258,13 @@ $("dl-number").addEventListener("click", () => {
   const sheet = drawSheet(state.mapped, state.cols, state.rows, state.used, "number");
   downloadCanvas(sheet, `拼豆编号图_${state.cols}x${state.rows}.png`);
 });
-$("dl-list").addEventListener("click", () =>
-  downloadList(state.used, state.cols, state.rows));
+$("dl-list").addEventListener("click", () => downloadList(state.used, state.cols, state.rows));
 
-/* 尺寸改变时若已有结果自动重生成 */
 ["cols", "rows", "maxC", "palette", "fillBlank", "cut-auto"].forEach(id => {
   $(id).addEventListener(id === "cols" || id === "rows" ? "change" : "change",
     () => { if (state.mapped) $("gen").click(); });
 });
-$("keepRatio").addEventListener("change", () => {
-  if (state.mapped) { $("gen").click(); }
-});
+$("keepRatio").addEventListener("change", () => { if (state.mapped) $("gen").click(); });
 showHint();
 </script>
 </body>

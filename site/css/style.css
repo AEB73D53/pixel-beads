@@ -1,4 +1,4 @@
-/* 拼豆助手 · 官网样式 —— 现代拟态风（与桌面版一致） */
+/* 拼豆助手 · 官网样式（双语版）—— 现代拟态风 */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 :root {
   --bg: #EDF0F4; --card: #F5F7FA; --paper: #FFFFFF;
@@ -13,6 +13,20 @@ body { background: var(--bg); color: var(--ink);
 a { color: var(--teal); text-decoration: none; }
 a:hover { text-decoration: underline; }
 .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+
+/* 语言切换 */
+.lang-sel { position: relative; display: inline-block; }
+.lang-sel button { background: rgba(255,255,255,.08); color: #C3CBD6;
+  border: none; padding: 4px 12px; border-radius: 14px; cursor: pointer;
+  font-size: 13px; }
+.lang-sel button:hover { background: rgba(255,255,255,.15); color: #fff; }
+.lang-sel .drop { display: none; position: absolute; right: 0; top: 28px;
+  background: #fff; border-radius: 8px; box-shadow: 0 4px 14px var(--shadow);
+  z-index: 100; min-width: 100px; }
+.lang-sel .drop a { display: block; padding: 8px 14px; color: var(--ink);
+  font-size: 13px; white-space: nowrap; }
+.lang-sel .drop a:hover { background: var(--bg); text-decoration: none; }
+.lang-sel.open .drop { display: block; }
 
 /* 头部 */
 header { background: var(--ink); position: sticky; top: 0; z-index: 50; }
