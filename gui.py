@@ -303,6 +303,14 @@ class App(tk.Tk):
         self._swatch_chips = []       # 色板chips：(name, canvas, outline_item)
         self.done_cells = set()       # 拼制进度：已拼格子集合 (r, c)
         self._done_items = []         # 画布上已拼 X 记号的 canvas item
+        # 右画布（拼豆图纸）状态
+        self.canvas_right_photo = None
+        self.full_img_right = None
+        self.zoom_level_right = 1.0
+        self.canvas_offset_x_r = 0
+        self.canvas_offset_y_r = 0
+        self._dragging_right = False
+        self._drag_start_right = (0, 0)
 
         self._last_path = None          # 最近打开图片（供“记住上次设置”）
         self._setup_style()
@@ -385,27 +393,45 @@ class App(tk.Tk):
         body = tk.Frame(self, bg=BG, padx=16, pady=14)
         body.pack(fill=tk.BOTH, expand=True)
 
-        # 左：画布纸面
+        # 左：双画布（原图 | 拼豆图纸）
         left = tk.Frame(body, bg=BG)
         left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        canvas_card = tk.Frame(left, bg=PAPER)
-        canvas_card.pack(fill=tk.BOTH, expand=True)
-        self.canvas = tk.Canvas(canvas_card, bg=PAPER, highlightthickness=0,
-                                width=820, height=640)
+
+        # 左画布容器（原图/抠图）
+        left_card = tk.Frame(left, bg=PAPER)
+        left_card.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 3))
+        tk.Label(left_card, text="原图", bg=PAPER, fg=INK_FAINT,
+                 font=(FONT, 9), anchor=tk.W).pack(fill=tk.X, padx=6, pady=(2, 0))
+        self.canvas = tk.Canvas(left_card, bg=PAPER, highlightthickness=0, width=400, height=600)
         self.canvas.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
         self.canvas.bind("<Button-1>", self.on_canvas_click)
         self.canvas.bind("<B1-Motion>", self.on_canvas_drag)
         self.canvas.bind("<Button-3>", lambda e: self.clear_crop())
         self.canvas.bind("<MouseWheel>", self.on_mousewheel)
         self.canvas.bind("<Control-MouseWheel>", self.on_mousewheel)
-        # 中键/滚轮按下拖动
         self.canvas.bind("<Button-2>", self.on_canvas_press)
         self.canvas.bind("<B2-Motion>", self.on_canvas_drag_move)
         self.canvas.bind("<ButtonRelease-2>", self.on_canvas_release)
-        # Ctrl+左键 拖动（备用）
         self.canvas.bind("<Control-Button-1>", self.on_canvas_press)
         self.canvas.bind("<Control-B1-Motion>", self.on_canvas_drag_move)
         self.canvas.bind("<Control-ButtonRelease-1>", self.on_canvas_release)
+
+        # 右画布容器（拼豆图纸）
+        right_card = tk.Frame(left, bg=PAPER)
+        right_card.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(3, 0))
+        tk.Label(right_card, text="拼豆图纸", bg=PAPER, fg=INK_FAINT,
+                 font=(FONT, 9), anchor=tk.W).pack(fill=tk.X, padx=6, pady=(2, 0))
+        self.canvas_right = tk.Canvas(right_card, bg=PAPER, highlightthickness=0,
+                                      width=400, height=600)
+        self.canvas_right.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
+        self.canvas_right.bind("<MouseWheel>", self.on_mousewheel_right)
+        self.canvas_right.bind("<Control-MouseWheel>", self.on_mousewheel_right)
+        self.canvas_right.bind("<Button-2>", self.on_canvas_press_right)
+        self.canvas_right.bind("<B2-Motion>", self.on_canvas_drag_move_right)
+        self.canvas_right.bind("<ButtonRelease-2>", self.on_canvas_release_right)
+        self.canvas_right.bind("<Control-Button-1>", self.on_canvas_press_right)
+        self.canvas_right.bind("<Control-B1-Motion>", self.on_canvas_drag_move_right)
+        self.canvas_right.bind("<Control-ButtonRelease-1>", self.on_canvas_release_right)
 
         # 缩放工具条（画布底部）
         zbar = tk.Frame(left, bg=BG)
@@ -600,27 +626,30 @@ class App(tk.Tk):
                                     outline="" if ch_ == "." else r2)
 
     # ---------------------------------------------------------- 空态引导
+    def _empty_canvas(self, canvas, w, h, title, sub):
+        canvas.delete("all")
+        step = 36
+        for x in range(0, w, step):
+            canvas.create_line(x, 0, x, h, fill="#F1F3F7")
+        for y in range(0, h, step):
+            canvas.create_line(0, y, w, y, fill="#F1F3F7")
+        canvas.create_text(w / 2, h / 2 - 20, text=title,
+                           fill="#AAB3C0", font=(FONT, 18, "bold"))
+        canvas.create_text(w / 2, h / 2 + 14, text=sub,
+                           fill="#B8C0CC", font=(FONT, 10))
+
     def draw_empty_state(self):
         self.canvas.delete("all")
         self.canvas_item = None
-        w = self.canvas.winfo_width() or 820
-        h = self.canvas.winfo_height() or 640
-        step = 36
-        for x in range(0, w, step):
-            self.canvas.create_line(x, 0, x, h, fill="#F1F3F7")
-        for y in range(0, h, step):
-            self.canvas.create_line(0, y, w, y, fill="#F1F3F7")
-        self.canvas.create_text(w / 2, h / 2 - 30, text="还没有图片",
-                                fill="#AAB3C0", font=(FONT, 22, "bold"))
-        self.canvas.create_text(w / 2, h / 2 + 12,
-                                text="点击左上角「打开图片…」选择一张照片",
-                                fill="#B8C0CC", font=(FONT, 11))
-        self.canvas.create_text(w / 2, h / 2 + 42,
-                                text="推荐纯色背景 · 主体清晰 · 1:1 方形更佳",
-                                fill="#C5CCD6", font=(FONT, 9))
-        self.canvas.create_text(w / 2, h / 2 + 66,
-                                text="图纸可滚轮缩放 · 按住滚轮（中键）拖动查看",
-                                fill="#C5CCD6", font=(FONT, 8))
+        self.canvas_right.delete("all")
+        w1 = self.canvas.winfo_width() or 400
+        h1 = self.canvas.winfo_height() or 600
+        w2 = self.canvas_right.winfo_width() or 400
+        h2 = self.canvas_right.winfo_height() or 600
+        self._empty_canvas(self.canvas, w1, h1, "还没有图片",
+                           "点击左上角「打开图片…」选择一张照片\n推荐纯色背景 · 主体清晰")
+        self._empty_canvas(self.canvas_right, w2, h2, "拼豆图纸",
+                           "点「生成图纸」后图纸会显示在这里\n滚轮缩放 · 按住滚轮拖动")
 
     # ---------------------------------------------------------- 状态
     def set_status(self, text):
@@ -682,6 +711,96 @@ class App(tk.Tk):
         self.canvas_offset_x = 0
         self.canvas_offset_y = 0
         self._apply_zoom()
+
+    # ---------------------------------------------------------- 右画布（拼豆图纸）
+    def show_pil_right(self, im):
+        """把 PIL 图像显示在右画布。"""
+        self.full_img_right = im
+        self.zoom_level_right = 1.0
+        self.canvas_offset_x_r = 0
+        self.canvas_offset_y_r = 0
+        self._apply_zoom_right()
+
+    def _apply_zoom_right(self):
+        if self.full_img_right is None:
+            return
+        im = self.full_img_right
+        cw = self.canvas_right.winfo_width() or 400
+        ch = self.canvas_right.winfo_height() or 600
+        base_ratio = min((cw - 8) / im.width, (ch - 8) / im.height)
+        ratio = base_ratio * self.zoom_level_right
+        new_w = max(1, int(im.width * ratio))
+        new_h = max(1, int(im.height * ratio))
+        disp = im.resize((new_w, new_h))
+        self.canvas_right_photo = ImageTk.PhotoImage(disp)
+        self.canvas_right.delete("all")
+        x = max(4, (cw - new_w) // 2) + self.canvas_offset_x_r
+        y = max(4, (ch - new_h) // 2) + self.canvas_offset_y_r
+        self.canvas_right.create_image(x, y, anchor=tk.NW, image=self.canvas_right_photo)
+        self.zoom_label.config(text=f"{int(self.zoom_level_right * 100)}%")
+
+    def on_mousewheel_right(self, ev):
+        if self.full_img_right is None:
+            return
+        new_zoom = max(0.1, min(10.0, self.zoom_level_right * (1.1 if ev.delta > 0 else 0.9)))
+        im = self.full_img_right
+        cw = self.canvas_right.winfo_width() or 400
+        ch = self.canvas_right.winfo_height() or 600
+        base_ratio = min((cw - 8) / im.width, (ch - 8) / im.height)
+        old_ratio = base_ratio * self.zoom_level_right
+        new_ratio = base_ratio * new_zoom
+        old_w = max(1, int(im.width * old_ratio))
+        old_h = max(1, int(im.height * old_ratio))
+        new_w = max(1, int(im.width * new_ratio))
+        new_h = max(1, int(im.height * new_ratio))
+        old_x0 = max(4, (cw - old_w) // 2) + self.canvas_offset_x_r
+        old_y0 = max(4, (ch - old_h) // 2) + self.canvas_offset_y_r
+        rx = (ev.x - old_x0) / max(1e-6, old_w)
+        ry = (ev.y - old_y0) / max(1e-6, old_h)
+        new_x0 = max(4, (cw - new_w) // 2)
+        new_y0 = max(4, (ch - new_h) // 2)
+        self.canvas_offset_x_r = ev.x - new_x0 - int(rx * new_w)
+        self.canvas_offset_y_r = ev.y - new_y0 - int(ry * new_h)
+        self.zoom_level_right = new_zoom
+        self._apply_zoom_right()
+
+    def on_canvas_press_right(self, ev):
+        if self.full_img_right is None:
+            return
+        self._dragging_right = True
+        cw = self.canvas_right.winfo_width() or 400
+        ch = self.canvas_right.winfo_height() or 600
+        im = self.full_img_right
+        base_ratio = min((cw - 8) / im.width, (ch - 8) / im.height)
+        ratio = base_ratio * self.zoom_level_right
+        img_w = max(1, int(im.width * ratio))
+        img_h = max(1, int(im.height * ratio))
+        x0 = max(4, (cw - img_w) // 2)
+        y0 = max(4, (ch - img_h) // 2)
+        self._drag_start_right = (ev.x - self.canvas_offset_x_r - x0,
+                                  ev.y - self.canvas_offset_y_r - y0)
+        self.canvas_right.config(cursor="fleur")
+
+    def on_canvas_drag_move_right(self, ev):
+        if not self._dragging_right:
+            return
+        cw = self.canvas_right.winfo_width() or 400
+        ch = self.canvas_right.winfo_height() or 600
+        im = self.full_img_right
+        base_ratio = min((cw - 8) / im.width, (ch - 8) / im.height)
+        ratio = base_ratio * self.zoom_level_right
+        img_w = max(1, int(im.width * ratio))
+        img_h = max(1, int(im.height * ratio))
+        x0 = max(4, (cw - img_w) // 2)
+        y0 = max(4, (ch - img_h) // 2)
+        self.canvas_offset_x_r = ev.x - x0 - self._drag_start_right[0]
+        self.canvas_offset_y_r = ev.y - y0 - self._drag_start_right[1]
+        self._apply_zoom_right()
+
+    def on_canvas_release_right(self, ev):
+        if self._dragging_right:
+            self._dragging_right = False
+            self.canvas_right.config(cursor="arrow")
 
     def on_mousewheel(self, ev):
         if self.full_img is None:
@@ -1094,7 +1213,7 @@ class App(tk.Tk):
             self.number_preview = be.render_number_view(result, cols, rows, used,
                                                         cell_px=36, margin=16)
             self.showing_number = False
-            self.show_pil(self.color_preview)
+            self.show_pil_right(self.color_preview)
             # 单色分布条
             self._build_swatches([(n, hx) for n, hx, _c in used])
             self.swatch_card.pack(fill=tk.X, pady=(8, 0))
@@ -1122,11 +1241,11 @@ class App(tk.Tk):
             return
         self.showing_number = not self.showing_number
         if self.showing_number:
-            self.show_pil(self.number_preview)
+            self.show_pil_right(self.number_preview)
             self.toggle_btn.set_text("◀ 颜色图")
             self.status("编号图模式：格内数字=颜色编号，底部图例对照")
         else:
-            self.show_pil(self.color_preview)
+            self.show_pil_right(self.color_preview)
             self.toggle_btn.set_text("编号图 ▶")
             self.status("颜色图模式：直接看颜色拼豆")
 
@@ -1149,9 +1268,9 @@ class App(tk.Tk):
             self.result, self.grid_cols, self.grid_rows, self.used_colors,
             cell_px=36, margin=16, highlight=hl)
         if self.showing_number:
-            self.show_pil(self.number_preview)
+            self.show_pil_right(self.number_preview)
         else:
-            self.show_pil(self.color_preview)
+            self.show_pil_right(self.color_preview)
         self.status("已%s翻转图纸，颜色分布已更新" % ("水平" if axis == "h" else "垂直"))
 
     # ---------------------------------------------------------- 单色分布视图
@@ -1206,7 +1325,7 @@ class App(tk.Tk):
             return
         if self.showing_number:     # 编号图同样支持单色高亮
             self._rebuild_number_preview(highlight=name)
-            self.show_pil(self.number_preview)
+            self.show_pil_right(self.number_preview)
         else:
             self._rebuild_color_preview(highlight=name)
         if name:
@@ -1218,7 +1337,7 @@ class App(tk.Tk):
         self.color_preview = be.render_grid_preview(
             self.cached_cells, self.result, self.grid_cols, self.grid_rows,
             cell_px=120, out_w=760, highlight=highlight)
-        self.show_pil(self.color_preview)
+        self.show_pil_right(self.color_preview)
 
     def _rebuild_number_preview(self, highlight=None):
         self.number_preview = be.render_number_view(
