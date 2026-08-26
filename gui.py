@@ -523,6 +523,27 @@ class App(tk.Tk):
         ttk.Checkbutton(g4, text="空白格用白色豆填满（铺满底板）",
                         variable=self.bg_fill).pack(anchor=tk.W)
 
+        # ⑤ 卡通化
+        g5 = self._card(inner, "⑤ 卡通化")
+        g5.pack(fill=tk.X, pady=(2, 8))
+        self.cartoon_enabled = tk.BooleanVar(value=False)
+        ttk.Checkbutton(g5, text="开启卡通化（粗黑边 + 平涂色块，更适合拼豆）",
+                        variable=self.cartoon_enabled).pack(anchor=tk.W)
+        row5 = tk.Frame(g5, bg=CARD)
+        row5.pack(fill=tk.X, pady=(4, 2))
+        tk.Label(row5, text="边缘", bg=CARD, fg=INK, font=(FONT, 9)).pack(side=tk.LEFT)
+        self.cartoon_edge = ttk.Spinbox(row5, from_=1, to=5, width=3)
+        self.cartoon_edge.set(3); self.cartoon_edge.pack(side=tk.LEFT, padx=4)
+        tk.Label(row5, text="平滑", bg=CARD, fg=INK, font=(FONT, 9)).pack(side=tk.LEFT, padx=(10, 0))
+        self.cartoon_smooth = ttk.Spinbox(row5, from_=1, to=5, width=3)
+        self.cartoon_smooth.set(3); self.cartoon_smooth.pack(side=tk.LEFT, padx=4)
+        self.cartoon_status = tk.Label(row5, text="", bg=CARD, fg=TEAL, font=(FONT, 8))
+        self.cartoon_status.pack(side=tk.LEFT, padx=8)
+        Chip(row5, "检测主体", self._detect_subject, color="#E9EDF3",
+             fg=INK_SOFT, font=(FONT, 8, "bold")).pack(side=tk.LEFT, padx=(6, 0))
+        tk.Label(g5, text="边缘越粗线条越突出，平滑越强颜色越平",
+                 bg=CARD, fg=INK_FAINT, font=(FONT, 8)).pack(anchor=tk.W, pady=(2, 0))
+
         # 主 CTA + 进度
         self.gen_btn = RoundedButton(inner, "生 成 图 纸", self.generate,
                                      color=BEAD, fg="#FFFFFF",
@@ -990,6 +1011,22 @@ class App(tk.Tk):
             rows = max(2, round(cols * base.height / base.width))
         return cols, rows, base
 
+    def _detect_subject(self):
+        """检测主体并显示结果。"""
+        if self.base is None:
+            messagebox.showinfo(APP_NAME, "请先打开一张图片。")
+            return
+        # 用当前抠图模式得到 base
+        self.apply_cutout()
+        _, subject_found, ratio = be.cartoonize(
+            self.base, subject_detect=True, edge_size=1, smooth_level=1)
+        if subject_found:
+            self.cartoon_status.config(
+                text="OK 主体已检测（%.0f%%）" % (ratio * 100), fg=TEAL)
+        else:
+            self.cartoon_status.config(
+                text="主体不明显（%.0f%%），建议手动框选" % (ratio * 100), fg=BEAD)
+
     def generate(self):
         if self.base is None:
             messagebox.showinfo(APP_NAME, "请先打开一张图片。")
@@ -1003,6 +1040,21 @@ class App(tk.Tk):
 
         try:
             cols, rows, base = self._grid_size()
+            # 阶段 0：卡通化（可选）
+            if self.cartoon_enabled.get():
+                edge = int(self.cartoon_edge.get())
+                smooth = int(self.cartoon_smooth.get())
+                self.status("正在卡通化…")
+                self.update_idletasks()
+                cartoon, subject_found, subject_ratio = be.cartoonize(
+                    base, subject_detect=True, edge_size=edge, smooth_level=smooth)
+                if not subject_found:
+                    messagebox.showwarning(
+                        APP_NAME,
+                        "未检测到明显主体（主体只占画面 %.0f%%）。\n"
+                        "建议使用「手动框选」圈出主体，或换一张主体清晰的照片。"
+                        % (subject_ratio * 100))
+                base = cartoon.convert("RGBA")
             self._remember_settings()   # 生成即记住当前参数
             # 阶段 1：网格化
             self.prog.set_value(0, 0.5)

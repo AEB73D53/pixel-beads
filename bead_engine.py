@@ -651,3 +651,81 @@ def render_number_view(result, cols, rows, used_colors, cell_px=36, margin=16,
     sheet.paste(grid, (0, 0))
     _draw_number_legend(sheet, used_colors, gw, gh + 10, cell_px, cell_px, margin)
     return sheet
+
+
+# --------------------------------------------------------------------------
+# 步骤五：卡通化（纯 OpenCV 算法，零 AI 模型，离线运行）
+# --------------------------------------------------------------------------
+
+def cartoonize(image, subject_detect=True, edge_size=3, smooth_level=3):
+    """把照片卡通化：边缘保留平滑 + 自适应粗黑边 + 颜色量化平涂。
+
+    Parameters
+    ----------
+    image : PIL.Image (RGBA)
+    subject_detect : bool
+        是否检测主体（通过 alpha 通道判断非透明区域占比）
+    edge_size : int (1-5)
+        边缘线粗细，越大越粗
+    smooth_level : int (1-5)
+        平滑强度，越大颜色越平
+
+    Returns
+    -------
+    (pil_result, subject_found, subject_ratio)
+    pil_result : PIL.Image (RGB)
+        卡通化后的图
+    subject_found : bool
+        True = 检测到主体
+    subject_ratio : float
+        主体占画面比例（0~1）
+    """
+    # 1. RGBA → BGRA ndarray
+    bgra = _cv2img(image)
+    if bgra.shape[2] != 4:
+        bgra = cv2.cvtColor(bgra, cv2.COLOR_BGR2BGRA)
+    h, w = bgra.shape[:2]
+    alpha = bgra[:, :, 3] / 255.0
+
+    # 2. 主体检测
+    subject_found = True
+    subject_ratio = (alpha >= 0.5).sum() / max(1, h * w)
+    if subject_ratio < 0.08:
+        subject_found = False
+
+    # 3. 用 alpha 做透明背景的白底填充（rgba 合成到白底）
+    bgr = bgra[:, :, :3]
+    bg_white = np.full_like(bgr, 255)
+    composite = (bgr * alpha[:, :, None] + bg_white * (1 - alpha[:, :, None])).astype(np.uint8)
+
+    # 4. 边缘保留平滑（多级双边滤波）
+    smooth = composite.copy()
+    for _ in range(smooth_level):
+        smooth = cv2.bilateralFilter(smooth, d=9, sigmaColor=18, sigmaSpace=8)
+
+    # 5. 颜色量化（K-Means 降色到 12-16 色，平涂感）
+    reshaped = smooth.reshape(-1, 3).astype(np.float32)
+    k = max(4, min(16, max(8, (h * w) // 20000)))
+    crit = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 15, 1.0)
+    _, labels, centers = cv2.kmeans(reshaped, k, None, crit, 5, cv2.KMEANS_PP_CENTERS)
+    quantized = centers[labels.flatten()].reshape(h, w, 3).astype(np.uint8)
+
+    # 6. 边缘检测 + 加粗黑边
+    gray = cv2.cvtColor(composite, cv2.COLOR_BGR2GRAY)
+    gray_smooth = cv2.medianBlur(gray, 5)
+    edges = cv2.adaptiveThreshold(gray_smooth, 255,
+                                  cv2.ADAPTIVE_THRESH_MEAN_C,
+                                  cv2.THRESH_BINARY, blockSize=9, C=2)
+    # 膨胀黑边到指定粗细
+    ksize = max(1, edge_size)
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (ksize, ksize))
+    edges = cv2.dilate(255 - edges, kernel)
+    edges = 255 - edges
+
+    # 7. 合并：黑边叠在色块上
+    edges_3c = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
+    cartoon = cv2.bitwise_and(quantized, edges_3c)
+
+    # 8. 转回 PIL
+    result = _pil(cartoon, "RGB")
+    return result, subject_found, subject_ratio
