@@ -6,6 +6,7 @@ import os
 import shutil
 import sys
 import threading
+import webbrowser
 import tkinter as tk
 import tkinter.font as tkfont
 from tkinter import ttk, filedialog, messagebox
@@ -57,6 +58,15 @@ def storage_dir():
     if getattr(sys, "frozen", False):
         return os.path.dirname(sys.executable)
     return os.path.dirname(os.path.abspath(__file__))
+
+
+def _guide_path():
+    """AI 卡通 Key 教程页路径：打包版取 _MEIPASS，源码版取脚本同级。"""
+    if getattr(sys, "frozen", False):
+        base = getattr(sys, "_MEIPASS", os.path.dirname(sys.executable))
+    else:
+        base = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base, "ai_cartoon_guide.html")
 
 
 import json as _json
@@ -313,6 +323,8 @@ class App(tk.Tk):
         self._drag_start_right = (0, 0)
 
         self._last_path = None          # 最近打开图片（供“记住上次设置”）
+        self._ai_key_var = tk.StringVar(value="")   # SenseNova API key（本地保存，不入源码）
+        self._ai_cartoon_running = False
         self._setup_style()
         self._build_ui()
         self.draw_empty_state()
@@ -568,6 +580,38 @@ class App(tk.Tk):
         Chip(row5, "检测主体", self._detect_subject, color="#E9EDF3",
              fg=INK_SOFT, font=(FONT, 8, "bold")).pack(side=tk.LEFT, padx=(6, 0))
         tk.Label(g5, text="边缘越粗线条越突出，平滑越强颜色越平",
+                 bg=CARD, fg=INK_FAINT, font=(FONT, 8)).pack(anchor=tk.W, pady=(2, 0))
+
+        # AI 卡通（SenseNova 图像编辑，真·AI 生成）
+        tk.Frame(g5, bg="#C9D0DA", height=1).pack(fill=tk.X, pady=(8, 4))
+        tk.Label(g5, text="AI 卡通（调用商汤 SenseNova，需联网）",
+                 bg=CARD, fg="#B9842C", font=(FONT, 9, "bold")).pack(anchor=tk.W)
+        krow = tk.Frame(g5, bg=CARD); krow.pack(fill=tk.X, pady=(3, 2))
+        tk.Label(krow, text="Key", bg=CARD, fg=INK_SOFT, font=(FONT, 8)).pack(side=tk.LEFT)
+        self._ai_key_entry = ttk.Entry(krow, textvariable=self._ai_key_var, width=26, show="●")
+        self._ai_key_entry.pack(side=tk.LEFT, padx=(4, 4))
+        Chip(krow, "保存", self._save_ai_key, color="#E9EDF3",
+             fg=INK_SOFT, font=(FONT, 8)).pack(side=tk.LEFT, padx=(2, 0))
+        self._ai_guide_link = tk.Label(krow, text="获取 Key 教程 →",
+                                       bg=CARD, fg="#2F6DB0",
+                                       font=(FONT, 8, "underline"), cursor="hand2")
+        self._ai_guide_link.pack(side=tk.LEFT, padx=(8, 0))
+        self._ai_guide_link.bind("<Button-1>", self._open_ai_guide)
+        promrow = tk.Frame(g5, bg=CARD); promrow.pack(fill=tk.X, pady=(2, 2))
+        tk.Label(promrow, text="风格", bg=CARD, fg=INK_SOFT, font=(FONT, 8)).pack(side=tk.LEFT)
+        self._ai_prompt_var = tk.StringVar(
+            value="把它变成可爱卡通风格，Q版动漫，色彩明亮")
+        self._ai_prompt_entry = ttk.Entry(promrow, textvariable=self._ai_prompt_var,
+                                          width=24)
+        self._ai_prompt_entry.pack(side=tk.LEFT, padx=(4, 0))
+        brow = tk.Frame(g5, bg=CARD); brow.pack(fill=tk.X, pady=(4, 0))
+        self._ai_btn = RoundedButton(brow, "AI 卡通化", self._ai_cartoon,
+                                     color="#8E6BDB", fg="#FFFFFF",
+                                     font=(FONT, 10, "bold"))
+        self._ai_btn.pack(side=tk.LEFT)
+        self._ai_status = tk.Label(brow, text="", bg=CARD, fg=TEAL, font=(FONT, 8))
+        self._ai_status.pack(side=tk.LEFT, padx=8)
+        tk.Label(g5, text="生成卡通图后替换原图，再点「生成图纸」即可",
                  bg=CARD, fg=INK_FAINT, font=(FONT, 8)).pack(anchor=tk.W, pady=(2, 0))
 
         # 主 CTA + 进度
@@ -1146,8 +1190,97 @@ class App(tk.Tk):
             self.cartoon_status.config(
                 text="主体不明显（%.0f%%），建议手动框选" % (ratio * 100), fg=BEAD)
 
+    def _save_ai_key(self):
+        """保存 SenseNova API key 到本地设置。"""
+        key = self._ai_key_var.get().strip()
+        if key:
+            self._remember_settings()
+            self._ai_status.config(text="Key 已保存", fg=TEAL)
+        else:
+            self._ai_status.config(text="请输入 Key", fg=BEAD)
+
+    def _open_ai_guide(self, ev=None):
+        """打开 AI 卡通 Key 获取教程页（本地 HTML，用系统浏览器）。"""
+        try:
+            path = _guide_path()
+            if os.path.exists(path):
+                webbrowser.open("file://" + os.path.abspath(path))
+            else:
+                webbrowser.open("https://platform.sensenova.cn/console/keys")
+        except Exception as e:
+            messagebox.showwarning(APP_NAME, "无法打开教程页：%s" % str(e))
+
+    def _ai_cartoon(self):
+        """AI 卡通化入口：校验后开线程调 API，成功后替换原图。
+        等待期间显示阶段文字 + 转动符号（非百分比进度，接口不返回进度）。"""
+        if self._ai_cartoon_running:
+            return
+        if self.base is None:
+            messagebox.showinfo(APP_NAME, "请先打开一张图片。")
+            return
+        key = self._ai_key_var.get().strip()
+        if not key:
+            self._ai_status.config(text="请先填写 API Key", fg=BEAD)
+            messagebox.showwarning(APP_NAME, "请先在上方填写 SenseNova API Key。\n在 platform.sensenova.cn 获取。")
+            return
+        prompt = self._ai_prompt_var.get().strip() or "把它变成可爱卡通风格，Q版动漫，色彩明亮"
+        self._ai_cartoon_running = True
+        self._ai_spinner_idx = 0
+        self._ai_phase = "准备中…"
+        self._ai_btn.set_state(True)
+        self._ai_btn.set_text("生成中…")
+        self._ai_status.config(text="⏳ 准备中…", fg="#B9842C")
+        self.status("AI 卡通化中…")
+        self.update_idletasks()
+        threading.Thread(
+            target=self._ai_cartoon_worker, args=(self.base, key, prompt),
+            daemon=True).start()
+        self._ai_spinner_tick()
+
+    def _ai_spinner_tick(self):
+        """转动符号循环（⏳/◐/◑/◒），仅表示「进行中」，不代表真实进度百分比。"""
+        if not self._ai_cartoon_running:
+            return
+        spins = ("◐", "◑", "◒", "❒")
+        phase = getattr(self, "_ai_phase", "处理中")
+        self._ai_status.config(text="%s  %s" % (spins[self._ai_spinner_idx % len(spins)], phase),
+                               fg="#B9842C")
+        self._ai_spinner_idx += 1
+        self.status("AI 卡通化中… %s" % phase)
+        self.after(450, self._ai_spinner_tick)
+
+    def _ai_cartoon_worker(self, image, key, prompt):
+        try:
+            self.after(0, lambda: setattr(self, "_ai_phase", "正在生成，请稍候（约数十秒）"))
+            result = be.ai_cartoonize(image, api_key=key, prompt=prompt)
+        except be.AICartoonError as e:
+            err = str(e)
+            result = None
+        except Exception as e:
+            err = "AI 卡通生成失败：%s" % str(e)
+            result = None
+        else:
+            err = None
+        self.after(0, lambda: self._ai_cartoon_done(result, err))
+
+    def _ai_cartoon_done(self, result, err):
+        self._ai_cartoon_running = False
+        self._ai_btn.set_state(False)
+        self._ai_btn.set_text("AI 卡通化")
+        if err:
+            self._ai_status.config(text="✕ 失败", fg=BEAD)
+            self.status("AI 卡通化失败")
+            messagebox.showerror(APP_NAME, err)
+            return
+        self._ai_status.config(text="✔ OK 已替换原图", fg=TEAL)
+        self.base = result.convert("RGBA")
+        self.show_pil(self.base)
+        self.status("AI 卡通化完成，已替换原图；可点击「生成图纸」")
+        # 若已有图纸，用卡通图重算预览（可选：让用户自己点生成更明确，此处仅刷新原图）
+
     def generate(self):
         if self.base is None:
+
             messagebox.showinfo(APP_NAME, "请先打开一张图片。")
             return
 
@@ -1343,6 +1476,7 @@ class App(tk.Tk):
         self.number_preview = be.render_number_view(
             self.result, self.grid_cols, self.grid_rows, self.used_colors,
             cell_px=36, margin=16, highlight=highlight)
+        self.show_pil_right(self.number_preview)
 
     # ---------------------------------------------------------- 导出（带预览）
     def _make_sheet(self):
@@ -1903,6 +2037,8 @@ class App(tk.Tk):
                 "bg_fill": bool(self.bg_fill.get()),
                 "mode": self.mode.get(),
                 "recent_image": self._last_path or "",
+            "ai_cartoon_key": getattr(self, "_ai_key_var", tk.StringVar())
+                                  .get() if hasattr(self, "_ai_key_var") else "",
             })
         except Exception:
             pass
@@ -1929,6 +2065,8 @@ class App(tk.Tk):
             recent = s.get("recent_image", "")
             if recent and os.path.exists(recent):
                 self.open_image(recent, suggest=False)
+            if s.get("ai_cartoon_key"):
+                self._ai_key_var.set(s["ai_cartoon_key"])
         except Exception:
             pass
 
@@ -2277,12 +2415,12 @@ def main():
         tb = traceback.format_exc()
         try:
             with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                   "拼豆助手_错误日志.txt"), "w", encoding="utf-8") as f:
+                                   "pixel-beads_错误日志.txt"), "w", encoding="utf-8") as f:
                 f.write(tb)
         except Exception:
             pass
         try:
-            messagebox.showerror(APP_NAME, f"程序发生错误：\n{tb}\n\n已写入“拼豆助手_错误日志.txt”。")
+            messagebox.showerror(APP_NAME, f"程序发生错误：\n{tb}\n\n已写入《pixel-beads_错误日志.txt》。")
         except Exception:
             pass
 

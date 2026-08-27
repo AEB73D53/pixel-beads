@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>pixel-beads · AI 卡通 API Key 获取教程</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Microsoft YaHei",sans-serif;
+background:#F5F7FA;color:#2B3440;line-height:1.7;padding:32px 16px}
+.wrap{max-width:760px;margin:0 auto;background:#FFFFFF;border-radius:12px;
+box-shadow:0 2px 16px rgba(43,52,64,.08);padding:32px 28px}
+h1{font-size:24px;color:#2B3440;margin-bottom:6px}
+.sub{color:#8A93A0;font-size:14px;margin-bottom:24px}
+h2{font-size:17px;color:#2B3440;margin:26px 0 12px;padding-left:10px;border-left:3px solid #E2707A}
+ol,ul{margin:0 0 14px 20px}
+li{margin:6px 0}
+code{background:#F0F2F6;padding:2px 7px;border-radius:4px;font-size:13px;color:#B9842C;
+word-break:break-all}
+.box{background:#FBFAF7;border:1px solid #EAE2D2;border-radius:8px;padding:14px 16px;margin:14px 0}
+.warn{background:#FFF6F0;border:1px solid #F5C9A8;color:#A85C1C}
+.ok{background:#F1F8F4;border:1px solid #BFE0D0;color:#2E7D52}
+.kv{font-family:Consolas,Monospace;background:#F0F2F6;border-radius:6px;padding:10px 12px;
+font-size:13px;margin:8px 0;word-break:break-all}
+a{color:#2F6DB0}
+.note{font-size:13px;color:#8A93A0;margin-top:24px;border-top:1px solid #EDF0F4;padding-top:16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>🎨 AI 卡通 · API Key 获取教程</h1>
+<p class="sub">pixel-beads 的「AI 卡通化」调用商汤 SenseNova 图像生成模型，需要 API Key。约 3 分钟搞定。</p>
+
+<h2>1. 登录 SenseNova 开放平台</h2>
+<ul>
+<li>打开 <code>https://platform.sensenova.cn</code></li>
+<li>用手机号或账号注册 / 登录</li>
+</ul>
+
+<h2>2. 创建（或进入）一个应用</h2>
+<ol>
+<li>左侧菜单进入「控制台 / 应用管理」</li>
+<li>点击「创建应用」，填个名字（比如 <code>pixel-beads</code>）即可</li>
+<li>如果已有应用，点进去即可，无需新建</li>
+</ol>
+
+<h2>3. 开通图像生成模型</h2>
+<div class="box warn">
+⚠️ 关键一步：模型默认可能未开通。必须在应用里添加图像模型，否则 API 会返回「未找到路由 / NOT_FOUND」。
+</div>
+<ol>
+<li>在应用页面找到「模型开通 / 添加模型」</li>
+<li>找到并启用 <code>sensenova-u1.5-lite</code>（图像创作模型，支持参考图 / 图生图）</li>
+<li>确认已开通（有的模型需先充额度或完成实名认证）</li>
+</ol>
+
+<h2>4. 获取 API Key</h2>
+<ol>
+<li>进入「API Keys / 密钥管理」（URL 形如 <code>/console/keys</code>）</li>
+<li>复制你的密钥，形如：<div class="kv">sk-xxxxxxxxxxxxxxxxxxxxxxxx</div></li>
+</ol>
+
+<h2>5. 粘贴到 pixel-beads</h2>
+<ol>
+<li>打开 pixel-beads，右侧「⑤ 卡通化」面板下方的「AI 卡通」区</li>
+<li>把 Key 粘贴到 Key 输入框，点「保存」</li>
+<li>打开一张图片 → 点「AI 卡通化」即可</li>
+</ol>
+
+<div class="box ok">
+✅ 调用的接口：<code>POST https://token.sensenova.cn/v1/images/edits</code>，模型 <code>sensenova-u1.5-lite</code>。
+</div>
+
+<h2>常见问题</h2>
+<ul>
+<li><b>提示「未找到路由 / NOT_FOUND」</b>：该应用没开通图像模型。回第 3 步添加 <code>sensenova-u1.5-lite</code>。</li>
+<li><b>提示鉴权失败 / 401</b>：Key 复制错了或已失效，重新复制。</li>
+<li><b>提示图片格式/尺寸不对</b>：原图需 ≥256px、宽高比别太扁，程序会自动适配，极端图请换一张。</li>
+<li><b>提示超时</b>：生成较慢或网络不稳，稍后再试。</li>
+</ul>
+
+<p class="note">你的 Key 只保存在本机设置文件中，不会上传、不会进代码仓库。请妥善保管，切勿公开。</p>
+</div>
+</body>
+</html>

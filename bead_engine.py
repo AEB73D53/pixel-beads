@@ -729,3 +729,119 @@ def cartoonize(image, subject_detect=True, edge_size=3, smooth_level=3):
     # 8. 转回 PIL
     result = _pil(cartoon, "RGB")
     return result, subject_found, subject_ratio
+
+
+# --------------------------------------------------------------------------
+# AI 卡通化（商汤 SenseNova 图像编辑模型，图生图）
+# --------------------------------------------------------------------------
+
+SENSENOVA_IMAGE_URL = "https://token.sensenova.cn/v1/images/edits"
+SENSENOVA_MODEL = "sensenova-u1.5-lite"
+
+# 图像编辑 API 的图片约束：边长 256–4096，宽高比 ≤ 2:1，≤ 10MB
+_AI_MIN_W = 256
+_AI_MAX_W = 4096
+_AI_MAX_MB = 10
+_AI_MAX_RATIO = 2.0
+
+
+class AICartoonError(Exception):
+    """AI 卡通生成失败（网络 / 鉴权 / 参数 / 额度）"""
+
+
+def _prep_image_for_ai(image: Image.Image) -> Image.Image:
+    """把图片预处理到接口可接受的规格（256–4096px、宽高比 ≤ 2:1），返回 RGB。"""
+    img = image.convert("RGB")
+    w, h = img.size
+    # 限制宽高比：取中间区域裁切到 ≤ 2:1
+    ratio = max(w / h, h / w)
+    if ratio > _AI_MAX_RATIO:
+        if w >= h:
+            nh = int(w / _AI_MAX_RATIO)
+            img = img.crop((0, (h - nh) // 2, w, (h + nh) // 2))
+        else:
+            nw = int(h / _AI_MAX_RATIO)
+            img = img.crop(((w - nw) // 2, 0, (w + nw) // 2, h))
+        w, h = img.size
+    # 放大到不小于 256；缩放到不超 4096
+    scale_up = max(1.0, _AI_MIN_W / max(w, h))
+    scale_down = min(1.0, _AI_MAX_W / max(w, h))
+    scale = scale_up if max(w, h) < _AI_MIN_W else scale_down
+    if scale != 1.0:
+        nw = max(_AI_MIN_W, min(_AI_MAX_W, int(w * scale)))
+        nh = max(_AI_MIN_W, min(_AI_MAX_W, int(h * scale)))
+        img = img.resize((nw, nh), Image.LANCZOS)
+    return img
+
+
+def ai_cartoonize(image: Image.Image, api_key: str, prompt: str = None) -> Image.Image:
+    """调用 SenseNova 图像编辑模型，把原图变成卡通风格，返回 PIL.Image(RGB)。
+
+    - image: 原图（任意模式）。内部会预处理到接口规格。
+    - api_key: SenseNova API key（Bearer 鉴权）。
+    - prompt: 风格提示词。
+    - 失败抛 AICartoonError（含服务端错误信息）。
+    """
+    import base64 as _base64
+    import requests as _requests
+
+    if not api_key or not api_key.strip():
+        raise AICartoonError("未配置 API key，请先在「卡通化」面板填写。")
+
+    prompt = prompt or "把它变成可爱卡通风格，Q版动漫，色彩明亮"
+    prep = _prep_image_for_ai(image)
+
+    buf = __import__("io").BytesIO()
+    prep.save(buf, format="PNG")
+    raw = buf.getvalue()
+    if len(raw) > _AI_MAX_MB * 1024 * 1024:
+        raise AICartoonError("预处理后图片仍超过 %dMB，请换一张小图。" % _AI_MAX_MB)
+    b64 = _base64.b64encode(raw).decode("ascii")
+    image_url = "data:image/png;base64," + b64
+
+    payload = {
+        "model": SENSENOVA_MODEL,
+        "images": [{"image_url": image_url}],
+        "prompt": prompt,
+        "n": 1,
+        "size": "auto",
+        "watermark": False,
+        "prompt_extend": True,
+        "response_format": "b64_json",
+    }
+    headers = {
+        "Authorization": "Bearer " + api_key.strip(),
+        "Content-Type": "application/json",
+    }
+    try:
+        resp = _requests.post(
+            SENSENOVA_IMAGE_URL, headers=headers, json=payload, timeout=300
+        )
+    except _requests.exceptions.Timeout:
+        raise AICartoonError("请求超时（生成较慢），请重试。")
+    except _requests.exceptions.ConnectionError:
+        raise AICartoonError("网络连接失败，请检查网络后重试。")
+    except _requests.exceptions.RequestException as e:
+        raise AICartoonError("网络请求失败：%s" % str(e))
+
+    if resp.status_code != 200:
+        try:
+            msg = resp.json().get("error", {}).get("message", resp.text[:200])
+        except Exception:
+            msg = resp.text[:200]
+        raise AICartoonError("接口返回错误(%d)：%s" % (resp.status_code, msg))
+
+    try:
+        data = resp.json().get("data")
+        if not data or not data[0].get("b64_json"):
+            raise AICartoonError("接口返回结果异常（无图片）。")
+        img_b64 = data[0]["b64_json"]
+        img_bytes = _base64.b64decode(img_b64)
+    except AICartoonError:
+        raise
+    except Exception as e:
+        raise AICartoonError("返回图片解析失败：%s" % str(e))
+
+    import io as _io
+    result = Image.open(_io.BytesIO(img_bytes)).convert("RGB")
+    return result
