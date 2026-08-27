@@ -117,14 +117,14 @@
     <p class="lead" data-lang="zh">功能与网页版一致，另支持 PDF / Excel 导出、拼豆灵感库、离线去背景</p>
     <p class="lead" data-lang="en" style="display:none">Same features as the web version, plus PDF/Excel export, inspiration gallery, and offline cutout</p>
     <div class="btnrow">
-      <a class="btn primary" id="dl-btn" href="https://github.com/AEB73D53/pixel-beads/releases" target="_blank">
+      <a class="btn primary" id="dl-btn" target="_blank" onclick="latestDl(event)">
         <span data-lang="zh">下载 Windows 版（桌面客户端）</span>
         <span data-lang="en" style="display:none">Download for Windows (desktop)</span>
       </a>
     </div>
     <div class="badges"><span>Windows</span><span data-lang="zh">单文件免安装</span><span data-lang="en" style="display:none">Portable · No install</span><span>~ 81 MB</span></div>
-    <p class="note" data-lang="zh">点击跳转到 GitHub Releases 页，下载最新桌面版（含 AI 卡通、PDF/Excel 导出）。</p>
-    <p class="note" data-lang="en" style="display:none">Jumps to GitHub Releases — grab the latest desktop build (AI cartoon, PDF/Excel export).</p>
+    <p class="note" data-lang="zh">点击下载即可获取桌面版（含 AI 卡通、PDF/Excel 导出），双击即可使用，无需安装。</p>
+    <p class="note" data-lang="en" style="display:none">Click to download the desktop app (AI cartoon, PDF/Excel export). Double-click to run — no install needed.</p>
   </div>
 </section>
 
@@ -159,6 +159,23 @@ function setLang(lang) {
 }
 function toggleLang() {
   document.getElementById("langSel").classList.toggle("open");
+}
+// 自动获取最新 Release 的 exe 下载链接
+function latestDl(e) {
+  e.preventDefault();
+  fetch("https://api.github.com/repos/AEB73D53/pixel-beads/releases/latest")
+    .then(r => r.json())
+    .then(data => {
+      if (!data.assets || !data.assets.length) {
+        window.open(data.html_url || "https://github.com/AEB73D53/pixel-beads/releases", "_blank");
+        return;
+      }
+      const exe = data.assets.find(a => /pixel-beads\.exe$/i.test(a.name));
+      window.open(exe ? exe.browser_download_url : data.html_url, "_blank");
+    })
+    .catch(() => {
+      window.open("https://github.com/AEB73D53/pixel-beads/releases", "_blank");
+    });
 }
 // 点击外部关闭下拉
 document.addEventListener("click", function(e) {
