@@ -24,5 +24,7 @@ site/test_*
 tk_probe.py
 shot_exe.py
 shot_exe.png
+# 会员兑换码表（含敏感凭证，绝不可提交！）
+server/codes.json
 # 交接文档（含敏感信息，绝不可提交到 GitHub！）
 HANDOFF.md

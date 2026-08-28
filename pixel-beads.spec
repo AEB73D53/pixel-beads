@@ -5,7 +5,7 @@ a = Analysis(
     ['gui.py'],
     pathex=[],
     binaries=[],
-    datas=[('README.md', '.'), ('ai_cartoon_guide.html', '.'), ('inspirations', 'inspirations')],
+    datas=[('README.md', '.'), ('ai_cartoon_guide.html', '.'), ('payment_alipay.png', '.'), ('inspirations', 'inspirations')],
     hiddenimports=['openpyxl', 'openpyxl.cell._writer', 'requests', 'urllib3', 'certifi', 'charset_normalizer'],
     hookspath=[],
     hooksconfig={},

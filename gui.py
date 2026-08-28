@@ -15,6 +15,7 @@ from PIL import Image, ImageDraw, ImageTk
 import palettes
 import bead_engine as be
 import inspirations as ins
+import member as member_mod
 
 
 APP_NAME = "拼豆助手"
@@ -371,7 +372,7 @@ class App(tk.Tk):
 
     def _build_ui(self):
         # ---- 顶部：深色主头 + 品牌 + 全局操作 ----
-        head = tk.Frame(self, bg="#2B3440", height=78)
+        head = tk.Frame(self, bg="#2B3440", height=92)
         head.pack(fill=tk.X)
         head.pack_propagate(False)
         logo = tk.Canvas(head, width=70, height=58, bg="#2B3440",
@@ -384,8 +385,10 @@ class App(tk.Tk):
                  font=(FONT, 20, "bold")).pack(anchor=tk.W)
         tk.Label(ttl, text="照片 → 像素格子 → 照着拼的图纸",
                  bg="#2B3440", fg="#A8B1BF", font=(FONT, 9)).pack(anchor=tk.W)
-        tools = tk.Frame(head, bg="#2B3440")
-        tools.pack(side=tk.RIGHT, padx=18, pady=16)
+        head_tools = tk.Frame(head, bg="#2B3440")
+        head_tools.pack(side=tk.RIGHT, padx=18, pady=16, fill=tk.X)
+        tools = tk.Frame(head_tools, bg="#2B3440")
+        tools.pack(side=tk.LEFT, fill=tk.X, expand=True)
         Chip(tools, "打开图片…", self.open_image,
              color="#FFFFFF", fg="#2B3440").pack(side=tk.LEFT)
         Chip(tools, "保存图纸 PNG", self.save_pattern,
@@ -400,6 +403,28 @@ class App(tk.Tk):
         self.toggle_btn = Chip(tools, "编号图 ▶", self.toggle_view,
                                color=BEAD, fg="#FFFFFF")
         self.toggle_btn.pack(side=tk.LEFT)
+        # 缩放工具条（挪到顶栏，不再夹在画布中间）
+        zbar = tk.Frame(head_tools, bg="#2B3440")
+        zbar.pack(side=tk.LEFT, padx=(12, 0))
+        self.zoom_out_btn = Chip(zbar, "－", lambda: self.zoom(0.85),
+                                 color="#3D4858", fg="#FFFFFF")
+        self.zoom_out_btn.pack(side=tk.LEFT, padx=(0, 4))
+        self.zoom_label = tk.Label(zbar, text="100%", bg="#2B3440", fg="#FFFFFF",
+                                   font=(FONT, 9, "bold"), width=6)
+        self.zoom_label.pack(side=tk.LEFT)
+        self.zoom_in_btn = Chip(zbar, "＋", lambda: self.zoom(1.18),
+                                color="#3D4858", fg="#FFFFFF")
+        self.zoom_in_btn.pack(side=tk.LEFT, padx=(4, 6))
+        Chip(zbar, "适应画布", self.zoom_fit, color=TEAL, fg="#FFFFFF").pack(side=tk.LEFT)
+        Chip(zbar, "⟷ 翻转", lambda: self.flip_view("h"),
+             color="#3D4858", fg="#A8B1BF", font=(FONT, 8, "bold")).pack(
+                 side=tk.LEFT, padx=(6, 0))
+        Chip(zbar, "↺ 重置", self.reset_progress,
+             color="#3D4858", fg="#A8B1BF", font=(FONT, 8, "bold")).pack(
+                 side=tk.LEFT, padx=(6, 0))
+        Chip(zbar, "⟳ 垂翻", lambda: self.flip_view("v"),
+             color="#3D4858", fg="#A8B1BF", font=(FONT, 8, "bold")).pack(
+                 side=tk.LEFT, padx=(6, 0))
 
         # ---- 主体 ----
         body = tk.Frame(self, bg=BG, padx=16, pady=14)
@@ -445,55 +470,9 @@ class App(tk.Tk):
         self.canvas_right.bind("<Control-B1-Motion>", self.on_canvas_drag_move_right)
         self.canvas_right.bind("<Control-ButtonRelease-1>", self.on_canvas_release_right)
 
-        # 缩放工具条（画布底部）
-        zbar = tk.Frame(left, bg=BG)
-        zbar.pack(fill=tk.X, pady=(8, 0))
-        self.zoom_out_btn = Chip(zbar, "－", lambda: self.zoom(0.85),
-                                 color=CARD, fg=INK)
-        self.zoom_out_btn.pack(side=tk.LEFT, padx=(0, 4))
-        self.zoom_label = tk.Label(zbar, text="100%", bg=BG, fg=INK,
-                                   font=(FONT, 9, "bold"), width=6)
-        self.zoom_label.pack(side=tk.LEFT)
-        self.zoom_in_btn = Chip(zbar, "＋", lambda: self.zoom(1.18),
-                                color=CARD, fg=INK)
-        self.zoom_in_btn.pack(side=tk.LEFT, padx=(4, 6))
-        Chip(zbar, "适应画布", self.zoom_fit, color=TEAL, fg="#FFFFFF").pack(side=tk.LEFT)
-        Chip(zbar, "⟷ 水平翻转", lambda: self.flip_view("h"),
-             color="#E9EDF3", fg=INK_SOFT, font=(FONT, 8, "bold")).pack(
-                 side=tk.LEFT, padx=(6, 0))
-        Chip(zbar, "⟳ 垂直翻转", lambda: self.flip_view("v"),
-             color="#E9EDF3", fg=INK_SOFT, font=(FONT, 8, "bold")).pack(
-                 side=tk.LEFT, padx=(6, 0))
-        Chip(zbar, "↺ 重置进度", self.reset_progress,
-             color="#E9EDF3", fg=INK_SOFT, font=(FONT, 8, "bold")).pack(
-                 side=tk.LEFT, padx=(6, 0))
-        tk.Label(zbar, text="滚轮缩放 · 按住滚轮拖动",
-                 bg=BG, fg=INK_FAINT, font=(FONT, 8)).pack(side=tk.RIGHT)
+        # 缩放工具条已移到顶栏
 
-        # 单色分布条（生成后显示；点颜色只高亮该色格子）
-        self.swatch_card = tk.Frame(left, bg=BG, bd=1, relief="solid",
-                                    highlightthickness=0,
-                                    highlightbackground="#C9D0DA")
-        self.swatch_card.pack(fill=tk.X, pady=(8, 0))
-        self.swatch_card.pack_forget()
-        head2 = tk.Frame(self.swatch_card, bg=BG)
-        head2.pack(fill=tk.X, padx=8, pady=(4, 2))
-        tk.Label(head2, text="单色分布（点颜色只看该色格子）", bg=BG, fg=INK_SOFT,
-                 font=(FONT, 8, "bold")).pack(side=tk.LEFT)
-        tk.Label(head2, text="滚轮横滑", bg=BG, fg=INK_FAINT,
-                 font=(FONT, 7)).pack(side=tk.RIGHT)
-        self.swatch_canvas = tk.Canvas(self.swatch_card, bg=BG, height=46,
-                                       highlightthickness=0)
-        self.swatch_inner = tk.Frame(self.swatch_canvas, bg=BG)
-        self.swatch_canvas.create_window((0, 0), window=self.swatch_inner,
-                                         anchor=tk.NW)
-        self.swatch_canvas.pack(fill=tk.X)
-        self.swatch_inner.bind(
-            "<Configure>",
-            lambda e: self.swatch_canvas.configure(
-                scrollregion=self.swatch_canvas.bbox("all")))
-        self.swatch_canvas.bind("<MouseWheel>", self._on_swatch_wheel)
-        self.swatch_canvas.bind("<Shift-MouseWheel>", self._on_swatch_wheel)
+        # 单色分布条：移到右侧面板，不在画布中间
 
         # 右：控制台卡片
         inner = tk.Frame(body, bg=BG, width=330)
@@ -588,14 +567,14 @@ class App(tk.Tk):
                  bg=CARD, fg="#B9842C", font=(FONT, 9, "bold")).pack(anchor=tk.W)
         krow = tk.Frame(g5, bg=CARD); krow.pack(fill=tk.X, pady=(3, 2))
         tk.Label(krow, text="Key", bg=CARD, fg=INK_SOFT, font=(FONT, 8)).pack(side=tk.LEFT)
-        self._ai_key_entry = ttk.Entry(krow, textvariable=self._ai_key_var, width=26, show="●")
-        self._ai_key_entry.pack(side=tk.LEFT, padx=(4, 4))
+        self._ai_key_entry = ttk.Entry(krow, textvariable=self._ai_key_var, width=20, show="●")
+        self._ai_key_entry.pack(side=tk.LEFT, padx=(4, 4), fill=tk.X, expand=True)
         Chip(krow, "保存", self._save_ai_key, color="#E9EDF3",
              fg=INK_SOFT, font=(FONT, 8)).pack(side=tk.LEFT, padx=(2, 0))
-        self._ai_guide_link = tk.Label(krow, text="获取 Key 教程 →",
+        self._ai_guide_link = tk.Label(g5, text="🔑 获取 Key 教程 →（点击打开）",
                                        bg=CARD, fg="#2F6DB0",
                                        font=(FONT, 8, "underline"), cursor="hand2")
-        self._ai_guide_link.pack(side=tk.LEFT, padx=(8, 0))
+        self._ai_guide_link.pack(anchor=tk.W, pady=(0, 2))
         self._ai_guide_link.bind("<Button-1>", self._open_ai_guide)
         promrow = tk.Frame(g5, bg=CARD); promrow.pack(fill=tk.X, pady=(2, 2))
         tk.Label(promrow, text="风格", bg=CARD, fg=INK_SOFT, font=(FONT, 8)).pack(side=tk.LEFT)
@@ -614,11 +593,91 @@ class App(tk.Tk):
         tk.Label(g5, text="生成卡通图后替换原图，再点「生成图纸」即可",
                  bg=CARD, fg=INK_FAINT, font=(FONT, 8)).pack(anchor=tk.W, pady=(2, 0))
 
+        # ⑥ 会员（骨架：收款码 + 兑换码激活；现有功能全部免费）
+        g6 = self._card(inner, "💎 会员")
+        g6.pack(fill=tk.X, pady=(2, 8))
+        self._member_status_var = tk.StringVar(value="未开通会员")
+        self._member_status_label = tk.Label(g6, textvariable=self._member_status_var,
+                 bg=CARD, fg="#8A93A0", font=(FONT, 9, "bold"),
+                 anchor=tk.W)
+        self._member_status_label.pack(fill=tk.X)
+        tk.Label(g6, text=member_mod.PRICE,
+                 bg=CARD, fg="#B9842C", font=(FONT, 8, "bold"),
+                 anchor=tk.W).pack(anchor=tk.W, pady=(2, 0))
+        # 收款码图片（打包进 exe；找不到则显示占位文字）
+        self._pay_img = None
+        try:
+            _mp = os.path.join(os.path.dirname(_guide_path()), "payment_alipay.png")
+            if os.path.exists(_mp):
+                _pil = Image.open(_mp).convert("RGB")
+                _w, _h = _pil.size
+                if _h > 180:
+                    _ratio = 180 / _h
+                    _pil = _pil.resize((int(_w * _ratio), 180), Image.LANCZOS)
+                self._pay_img = ImageTk.PhotoImage(_pil)
+                tk.Label(g6, image=self._pay_img, bg=CARD).pack(anchor=tk.CENTER, pady=(4, 2))
+            else:
+                tk.Label(g6, text="（收款码图片待配置）",
+                         bg=CARD, fg=INK_FAINT, font=(FONT, 8)).pack(anchor=tk.CENTER, pady=(4, 2))
+        except Exception:
+            tk.Label(g6, text="（收款码加载失败）",
+                     bg=CARD, fg="#C0392B", font=(FONT, 8)).pack(anchor=tk.CENTER, pady=(4, 2))
+
+        tk.Label(g6, text="扫码付款后，向客服获取兑换码并输入下方激活",
+                 bg=CARD, fg=INK_FAINT, font=(FONT, 7),
+                 anchor=tk.W).pack(anchor=tk.W, pady=(2, 0))
+        _arow = tk.Frame(g6, bg=CARD)
+        _arow.pack(fill=tk.X, pady=(4, 0))
+        tk.Label(_arow, text="兑换码", bg=CARD, fg=INK_SOFT, font=(FONT, 8)).pack(side=tk.LEFT)
+        self._member_code_var = tk.StringVar(value="")
+        self._member_code_entry = ttk.Entry(_arow, textvariable=self._member_code_var,
+                                            width=16)
+        self._member_code_entry.pack(side=tk.LEFT, padx=(4, 4), fill=tk.X, expand=True)
+        self._activate_btn = Chip(_arow, "激活", self._activate_member,
+                                  color="#27AE60", fg="#FFFFFF", font=(FONT, 8, "bold"))
+        self._activate_btn.pack(side=tk.LEFT)
+
+        # 刷新会员状态显示
+        self._refresh_member_display()
+
         # 主 CTA + 进度
         self.gen_btn = RoundedButton(inner, "生 成 图 纸", self.generate,
                                      color=BEAD, fg="#FFFFFF",
                                      font=(FONT, 13, "bold"))
         self.gen_btn.pack(fill=tk.X, pady=(4, 10))
+
+        # 单色分布：可折叠小面板（点标题展开/收起；生成后显示标题条）
+        self.swatch_card = tk.Frame(inner, bg=CARD, bd=1, relief="solid",
+                                    highlightthickness=0,
+                                    highlightbackground="#C9D0DA")
+        self.swatch_head = tk.Frame(self.swatch_card, bg=CARD, cursor="hand2")
+        self.swatch_head.pack(fill=tk.X, padx=0, pady=6)
+        self._swatch_open = False
+        self.swatch_arrow = tk.Label(self.swatch_head, text="▶",
+                                     bg=CARD, fg=INK_SOFT, font=(FONT, 8, "bold"),
+                                     anchor=tk.W)
+        self.swatch_arrow.pack(side=tk.LEFT, padx=(8, 4))
+        self.swatch_head.bind("<Button-1>", self._toggle_swatches)
+        self._swatch_title = tk.Label(self.swatch_head, text="单色分布",
+                 bg=CARD, fg=INK_SOFT, font=(FONT, 9, "bold"),
+                 cursor="hand2")
+        self._swatch_title.pack(side=tk.LEFT)
+        tk.Label(self.swatch_head, text="（点开只看该色格子）",
+                 bg=CARD, fg=INK_FAINT, font=(FONT, 7),
+                 cursor="hand2").pack(side=tk.LEFT, padx=(2, 0))
+        self.swatch_canvas = tk.Canvas(self.swatch_card, bg=CARD, height=58,
+                                       highlightthickness=0)
+        self.swatch_inner = tk.Frame(self.swatch_canvas, bg=CARD)
+        self.swatch_canvas.create_window((0, 0), window=self.swatch_inner,
+                                         anchor=tk.NW)
+        self.swatch_inner.bind(
+            "<Configure>",
+            lambda e: self.swatch_canvas.configure(
+                scrollregion=self.swatch_canvas.bbox("all")))
+        self.swatch_canvas.bind("<MouseWheel>", self._on_swatch_wheel)
+        self.swatch_canvas.bind("<Shift-MouseWheel>", self._on_swatch_wheel)
+        self.swatch_card.pack(fill=tk.X, pady=(2, 4))
+        # 初始就显示标题条；颜色区默认收起，生成后填充
 
         self.prog = SegmentedProgress(inner, bg=BG, width=306, height=22)
         self.prog.pack(fill=tk.X, pady=(0, 8))
@@ -938,7 +997,9 @@ class App(tk.Tk):
         self.remove_alpha = (m == "auto")
         self.highlight_color = None
         try:
-            self.swatch_card.pack_forget()
+            self.swatch_canvas.pack_forget()
+            self._swatch_open = False
+            self.swatch_arrow.config(text="▶")
         except Exception:
             pass
         self.show_pil(self.base)
@@ -1210,6 +1271,74 @@ class App(tk.Tk):
         except Exception as e:
             messagebox.showwarning(APP_NAME, "无法打开教程页：%s" % str(e))
 
+    def _refresh_member_display(self):
+        """刷新会员状态文字与颜色。"""
+        if member_mod.is_active():
+            self._member_status_var.set("✅ 会员有效期至 %s" %
+                                        member_mod._fmt(member_mod.expire_at()))
+            self._member_status_label.config(fg="#27AE60")
+        elif member_mod.is_expired():
+            self._member_status_var.set("⚠ 会员已过期")
+            self._member_status_label.config(fg="#C0392B")
+        else:
+            self._member_status_var.set("未开通会员")
+            self._member_status_label.config(fg="#8A93A0")
+
+    def _activate_member(self):
+        """打开兑换码激活弹窗（联网校验）。"""
+        code = self._member_code_var.get().strip().upper()
+        if not code:
+            messagebox.showwarning(APP_NAME, "请输入兑换码。")
+            return
+        self._activate_btn.config(state="disabled")
+        self.status("正在激活会员…")
+        threading.Thread(target=self._activate_member_worker,
+                         args=(code, member_mod.get_device_id()),
+                         daemon=True).start()
+
+    def _activate_member_worker(self, code, device_id):
+        """后台线程：调 /api/activate。"""
+        import urllib.request, urllib.error
+        payload = json.dumps({"code": code, "device_id": device_id}).encode("utf-8")
+        req = urllib.request.Request(
+            member_mod.VERIFY_URL,
+            data=payload, method="POST",
+            headers={"Content-Type": "application/json"},
+        )
+        ok = False
+        err_msg = ""
+        expire_at = None
+        try:
+            with urllib.request.urlopen(req, timeout=20) as r:
+                data = json.loads(r.read().decode("utf-8"))
+            if data.get("ok"):
+                expire_at = data.get("expire_at")
+                ok = True
+            else:
+                err_map = {
+                    "invalid": "兑换码无效，请检查后重试。",
+                    "used": "该兑换码已使用过。",
+                    "bound_other": "该兑换码已绑定在其他设备上。",
+                }
+                err_msg = err_map.get(data.get("err"), "激活失败：%s" % data.get("err"))
+        except urllib.error.HTTPError as e:
+            err_msg = "服务器错误（%d），请稍后再试。" % e.code
+        except Exception as e:
+            err_msg = "网络错误，请检查联网后重试。\n%s" % str(e)
+
+        self.after(0, lambda: self._activate_member_done(ok, err_msg, expire_at))
+
+    def _activate_member_done(self, ok, err_msg, expire_at):
+        self._activate_btn.config(state="normal")
+        if ok and expire_at:
+            member_mod.set_expire_at(expire_at)
+            self._refresh_member_display()
+            self.status("会员激活成功，有效期至 %s" % member_mod._fmt(expire_at))
+            messagebox.showinfo(APP_NAME, "🎉 会员激活成功！\n有效期至 %s" % member_mod._fmt(expire_at))
+        else:
+            self.status("激活失败：%s" % err_msg)
+            messagebox.showerror(APP_NAME, err_msg)
+
     def _ai_cartoon(self):
         """AI 卡通化入口：校验后开线程调 API，成功后替换原图。
         等待期间显示阶段文字 + 转动符号（非百分比进度，接口不返回进度）。"""
@@ -1349,7 +1478,9 @@ class App(tk.Tk):
             self.show_pil_right(self.color_preview)
             # 单色分布条
             self._build_swatches([(n, hx) for n, hx, _c in used])
-            self.swatch_card.pack(fill=tk.X, pady=(8, 0))
+            self._swatch_open = False
+            self.swatch_canvas.pack_forget()
+            self.swatch_arrow.config(text="▶")
             self.prog.set_done(2)
             self.status(f"生成完成：{cols}x{rows}，{len(used)} 种颜色，共 {total} 颗豆")
             lines_txt = [f"图纸尺寸：{cols} x {rows}   用色：{len(used)} 种   共需：{total} 颗豆",
@@ -1407,6 +1538,16 @@ class App(tk.Tk):
         self.status("已%s翻转图纸，颜色分布已更新" % ("水平" if axis == "h" else "垂直"))
 
     # ---------------------------------------------------------- 单色分布视图
+    def _toggle_swatches(self, ev=None):
+        """展开/收起单色分布面板。"""
+        if self._swatch_open:
+            self.swatch_canvas.pack_forget()
+            self.swatch_arrow.config(text="▶")
+        else:
+            self.swatch_canvas.pack(fill=tk.X, padx=6, pady=4)
+            self.swatch_arrow.config(text="▼")
+        self._swatch_open = not self._swatch_open
+
     def _on_swatch_wheel(self, ev):
         """单色条内滚轮 = 横向滚动（避免误触画布缩放）。"""
         if not self.swatch_inner.winfo_exists():
@@ -1903,7 +2044,9 @@ class App(tk.Tk):
         self.mode.set("none")     # 灵感图多为图纸/成品图，默认整张使用
         self.apply_cutout(reinteractive=True)
         try:
-            self.swatch_card.pack_forget()
+            self.swatch_canvas.pack_forget()
+            self._swatch_open = False
+            self.swatch_arrow.config(text="▶")
         except Exception:
             pass
         try:
