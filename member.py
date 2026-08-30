@@ -13,6 +13,8 @@
 from __future__ import annotations
 
 import hashlib
+import base64
+import hmac
 import json
 import os
 import platform
@@ -21,11 +23,82 @@ from datetime import datetime, timezone
 
 import sys
 
-# 与服务端 /api/activate 通信的地址（部署后改成真实域名）
-VERIFY_URL = "https://pixel-beads-member.aeb73d53.workers.dev/api/activate"
-
 # 会员价格文案（展示用）
 PRICE = "9.9 元/月 · 29 元/年"
+
+# 码表文件：打包进 exe（离线校验）
+_CODES_FILE = "offline_codes.json"
+
+# 加密 key（不入库；码表 base64 解码时 XOR 用）
+_XOR_KEY = "pixel-beads-2026-mem-secret-v1"
+
+# 计算兑换码 HMAC 的密钥（必须与 server/gen_offline_codes.py 的 --secret 一致）
+_SECRET = "pixel-beads-2026-mem-secret-v1"
+
+
+def _codes_path() -> str:
+    if getattr(sys, "frozen", False):
+        base = getattr(sys, "_MEIPASS", os.path.dirname(sys.executable))
+    else:
+        base = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base, _CODES_FILE)
+
+
+def _load_code_table() -> dict:
+    """加载离线码表；找不到或损坏则返回空表。"""
+    p = _codes_path()
+    if not os.path.exists(p):
+        return {"v": 1, "entries": []}
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            raw = f.read().strip()
+        # base64 解码 + XOR 解一层
+        decoded = base64.b64decode(raw)
+        key_b = _XOR_KEY.encode("utf-8")
+        plain = bytes(b ^ key_b[i % len(key_b)] for i, b in enumerate(decoded))
+        return json.loads(plain.decode("utf-8"))
+    except Exception:
+        return {"v": 1, "entries": []}
+
+
+_CODE_TABLE = _load_code_table()
+
+
+def _hmac_key(secret: str, code: str) -> str:
+    """与服务端 worker.js / gen_offline_codes.py 一致的 HMAC-SHA256 前 16 位。"""
+    return hmac.new(secret.encode(), code.upper().encode(), hashlib.sha256).hexdigest()[:16]
+
+
+def verify_offline(code: str) -> tuple[bool, str]:
+    """校验一个兑换码。返回 (是否有效, 到期 ISO 时间或错误提示)。"""
+    code = (code or "").strip().upper()
+    if not code:
+        return False, "请输入兑换码。"
+    # 本机已用过的码（防同设备重复激活）
+    s = _load_settings()
+    used = (s.get("member") or {}).get("used_codes", [])
+    if code in used:
+        return False, "该兑换码在本机已使用过。"
+    # 计算 HMAC 并在表里查找匹配
+    k = _hmac_key(_SECRET, code)
+    for e in _CODE_TABLE.get("entries", []):
+        if e.get("key") == k:
+            return True, e.get("expire_at") or ""
+    return False, "兑换码无效，请检查后重试。"
+
+
+def mark_code_used(code: str) -> None:
+    """激活成功后把码写进本机「已用」列表，防重复使用。"""
+    code = (code or "").strip().upper()
+    if not code:
+        return
+    s = _load_settings()
+    m = s.setdefault("member", {})
+    used = m.setdefault("used_codes", [])
+    if code not in used:
+        used.append(code)
+    _save_settings(s)
+
 
 # ---- 与 gui.py 共享 user_settings.json ----
 

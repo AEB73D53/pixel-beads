@@ -474,10 +474,29 @@ class App(tk.Tk):
 
         # 单色分布条：移到右侧面板，不在画布中间
 
-        # 右：控制台卡片
-        inner = tk.Frame(body, bg=BG, width=330)
-        inner.pack(side=tk.RIGHT, fill=tk.Y, padx=(14, 0))
-        inner.pack_propagate(False)
+        # 右：控制台卡片（带滚动条，卡片多了也能上下滚）
+        right_outer = tk.Frame(body, bg=BG, width=340)
+        right_outer.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(14, 0))
+        right_outer.pack_propagate(False)
+        self.right_canvas = tk.Canvas(right_outer, bg=BG, highlightthickness=0)
+        right_canvas = self.right_canvas
+        right_scroll = ttk.Scrollbar(right_outer, orient="vertical",
+                                     command=right_canvas.yview)
+        right_canvas.configure(yscrollcommand=right_scroll.set)
+        right_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        right_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        inner = tk.Frame(right_canvas, bg=BG)
+        right_win = right_canvas.create_window((0, 0), window=inner, anchor=tk.NW)
+        # 让 inner 跟随 canvas 宽度，避免右侧留空。
+        # ★ 修复：不能只 inner.configure(width=...)，pack 传播下这个设置无效，
+        #   卡片列会一直停留在 306 宽、面板右侧空出一大片。
+        #   直接设置 canvas 窗口项(item)的宽度才能强制 inner 拉伸到视口同宽。
+        def _sync_inner_scrollregion(e):
+            right_canvas.itemconfigure(right_win, width=e.width)
+            inner.configure(width=e.width)
+            right_canvas.update_idletasks()
+            right_canvas.configure(scrollregion=right_canvas.bbox("all"))
+        right_canvas.bind("<Configure>", _sync_inner_scrollregion)
 
         # ① 抠图
         g1 = self._card(inner, "① 抠图")
@@ -593,7 +612,7 @@ class App(tk.Tk):
         tk.Label(g5, text="生成卡通图后替换原图，再点「生成图纸」即可",
                  bg=CARD, fg=INK_FAINT, font=(FONT, 8)).pack(anchor=tk.W, pady=(2, 0))
 
-        # ⑥ 会员（骨架：收款码 + 兑换码激活；现有功能全部免费）
+        # ⑥ 会员（按钮，点开弹窗显示收款码 + 兑换码激活）
         g6 = self._card(inner, "💎 会员")
         g6.pack(fill=tk.X, pady=(2, 8))
         self._member_status_var = tk.StringVar(value="未开通会员")
@@ -601,41 +620,15 @@ class App(tk.Tk):
                  bg=CARD, fg="#8A93A0", font=(FONT, 9, "bold"),
                  anchor=tk.W)
         self._member_status_label.pack(fill=tk.X)
+        _mrow = tk.Frame(g6, bg=CARD); _mrow.pack(fill=tk.X, pady=(4, 0))
+        self._open_member_btn = Chip(_mrow, "💳 开通 / 激活会员",
+                                     self._open_member_dialog,
+                                     color="#8E6BDB", fg="#FFFFFF",
+                                     font=(FONT, 9, "bold"))
+        self._open_member_btn.pack(fill=tk.X)
         tk.Label(g6, text=member_mod.PRICE,
                  bg=CARD, fg="#B9842C", font=(FONT, 8, "bold"),
                  anchor=tk.W).pack(anchor=tk.W, pady=(2, 0))
-        # 收款码图片（打包进 exe；找不到则显示占位文字）
-        self._pay_img = None
-        try:
-            _mp = os.path.join(os.path.dirname(_guide_path()), "payment_alipay.png")
-            if os.path.exists(_mp):
-                _pil = Image.open(_mp).convert("RGB")
-                _w, _h = _pil.size
-                if _h > 180:
-                    _ratio = 180 / _h
-                    _pil = _pil.resize((int(_w * _ratio), 180), Image.LANCZOS)
-                self._pay_img = ImageTk.PhotoImage(_pil)
-                tk.Label(g6, image=self._pay_img, bg=CARD).pack(anchor=tk.CENTER, pady=(4, 2))
-            else:
-                tk.Label(g6, text="（收款码图片待配置）",
-                         bg=CARD, fg=INK_FAINT, font=(FONT, 8)).pack(anchor=tk.CENTER, pady=(4, 2))
-        except Exception:
-            tk.Label(g6, text="（收款码加载失败）",
-                     bg=CARD, fg="#C0392B", font=(FONT, 8)).pack(anchor=tk.CENTER, pady=(4, 2))
-
-        tk.Label(g6, text="扫码付款后，向客服获取兑换码并输入下方激活",
-                 bg=CARD, fg=INK_FAINT, font=(FONT, 7),
-                 anchor=tk.W).pack(anchor=tk.W, pady=(2, 0))
-        _arow = tk.Frame(g6, bg=CARD)
-        _arow.pack(fill=tk.X, pady=(4, 0))
-        tk.Label(_arow, text="兑换码", bg=CARD, fg=INK_SOFT, font=(FONT, 8)).pack(side=tk.LEFT)
-        self._member_code_var = tk.StringVar(value="")
-        self._member_code_entry = ttk.Entry(_arow, textvariable=self._member_code_var,
-                                            width=16)
-        self._member_code_entry.pack(side=tk.LEFT, padx=(4, 4), fill=tk.X, expand=True)
-        self._activate_btn = Chip(_arow, "激活", self._activate_member,
-                                  color="#27AE60", fg="#FFFFFF", font=(FONT, 8, "bold"))
-        self._activate_btn.pack(side=tk.LEFT)
 
         # 刷新会员状态显示
         self._refresh_member_display()
@@ -690,6 +683,27 @@ class App(tk.Tk):
         tk.Label(inner, text="生成后可在「编号图」与「颜色图」间切换预览",
                  bg=BG, fg=INK_FAINT, font=(FONT, 8), anchor=tk.W
                  ).pack(anchor=tk.W, fill=tk.X)
+
+        # 滚轮滚右侧面板（★ 修复）：之前只绑在 canvas 上，鼠标停在
+        # inner 里的任意卡片/按钮上时事件到不了 canvas，滚轮就没反应。
+        # 现在递归给 inner 全部子控件都绑上，唯独跳过单色分布的 swatch_canvas
+        # （它自己处理横向滚动）。绑定放在 _build_ui 末尾，确保所有卡片都已创建。
+        def _right_panel_wheel(ev):
+            self.right_canvas.yview_scroll(-int(ev.delta / 120), "units")
+            return "break"
+
+        def _bind_panel_wheel(w):
+            if w is getattr(self, "swatch_canvas", None):
+                return
+            if not w.bind("<MouseWheel>"):
+                w.bind("<MouseWheel>", _right_panel_wheel, add="+")
+            for c in w.winfo_children():
+                _bind_panel_wheel(c)
+
+        _bind_panel_wheel(inner)
+        # 内容下方露出的 canvas 空白条也要能滚
+        if not right_canvas.bind("<MouseWheel>"):
+            right_canvas.bind("<MouseWheel>", _right_panel_wheel, add="+")
 
         # ---- 底部状态条 ----
         bar = tk.Frame(self, bg="#2B3440", height=30)
@@ -1284,8 +1298,78 @@ class App(tk.Tk):
             self._member_status_var.set("未开通会员")
             self._member_status_label.config(fg="#8A93A0")
 
+    def _open_member_dialog(self):
+        """弹出会员激活对话框：收款码 + 兑换码输入。"""
+        dlg = tk.Toplevel(self)
+        dlg.title("💎 开通 / 激活会员")
+        dlg.transient(self)
+        dlg.geometry("360x520")
+        dlg.resizable(False, False)
+        dlg.configure(bg=BG)
+        # 收款码
+        # ★ 修复：_img 必须挂在对象上（dlg._pay_img），否则函数一返回就被
+        #   垃圾回收，Tk 里的图片随之删除，Label 变空白 —— 这就是之前
+        #   「弹窗里看不到收款码」的原因。
+        try:
+            _mp = os.path.join(os.path.dirname(_guide_path()), "payment_alipay.png")
+            if os.path.exists(_mp):
+                _pil = Image.open(_mp).convert("RGB")
+                _w, _h = _pil.size
+                _ratio = min(280 / _w, 320 / _h, 1.0)
+                if _ratio < 1.0:
+                    _pil = _pil.resize((max(1, int(_w * _ratio)),
+                                        max(1, int(_h * _ratio))), Image.LANCZOS)
+                dlg._pay_img = ImageTk.PhotoImage(_pil)
+                tk.Label(dlg, image=dlg._pay_img, bg=BG).pack(pady=(16, 8))
+            else:
+                tk.Label(dlg, text="（收款码图片待配置）", bg=BG,
+                         fg=INK_FAINT, font=(FONT, 9)).pack(pady=(16, 8))
+        except Exception:
+            tk.Label(dlg, text="（收款码加载失败）", bg=BG, fg="#C0392B",
+                     font=(FONT, 9)).pack(pady=(16, 8))
+        tk.Label(dlg, text="支付宝扫码付款（9.9 元/月 · 29 元/年）",
+                 bg=BG, fg="#B9842C", font=(FONT, 10, "bold")).pack()
+        tk.Label(dlg, text="付款后向客服获取兑换码，输入下方激活",
+                 bg=BG, fg=INK_FAINT, font=(FONT, 8)).pack(pady=(4, 0))
+        # 兑换码输入
+        row = tk.Frame(dlg, bg=BG); row.pack(pady=(12, 4))
+        tk.Label(row, text="兑换码", bg=BG, fg=INK,
+                 font=(FONT, 9, "bold")).pack(side=tk.LEFT)
+        code_var = tk.StringVar(value="")
+        entry = ttk.Entry(row, textvariable=code_var, width=22,
+                          font=(FONT, 11))
+        entry.pack(side=tk.LEFT, padx=(8, 4), fill=tk.X, expand=True)
+        entry.focus_set()
+        # 激活按钮
+        def _do_activate():
+            code = code_var.get().strip().upper()
+            if not code:
+                messagebox.showwarning("激活", "请输入兑换码。", parent=dlg)
+                return
+            try:
+                member_mod.mark_code_used  # noqa: B018  存在性检查
+            except Exception:
+                pass
+            ok, r = member_mod.verify_offline(code)
+            if ok and r:
+                member_mod.set_expire_at(r)
+                member_mod.mark_code_used(code)
+                self._refresh_member_display()
+                dlg.destroy()
+                messagebox.showinfo("激活成功",
+                                     "🎉 会员激活成功！\n有效期至 %s" %
+                                     member_mod._fmt(r), parent=self)
+            else:
+                messagebox.showerror("激活失败", r or "兑换码无效。", parent=dlg)
+        tk.Button(row, text="激活", command=_do_activate,
+                  bg="#27AE60", fg="#FFFFFF", font=(FONT, 9, "bold"),
+                  relief="flat", cursor="hand2", padx=12, pady=2).pack(
+                      side=tk.LEFT, padx=(4, 0))
+        # Enter 键激活
+        entry.bind("<Return>", lambda e: _do_activate())
+
     def _activate_member(self):
-        """打开兑换码激活弹窗（联网校验）。"""
+        """兑换码激活（本地离线校验）。"""
         code = self._member_code_var.get().strip().upper()
         if not code:
             messagebox.showwarning(APP_NAME, "请输入兑换码。")
@@ -1297,41 +1381,18 @@ class App(tk.Tk):
                          daemon=True).start()
 
     def _activate_member_worker(self, code, device_id):
-        """后台线程：调 /api/activate。"""
-        import urllib.request, urllib.error
-        payload = json.dumps({"code": code, "device_id": device_id}).encode("utf-8")
-        req = urllib.request.Request(
-            member_mod.VERIFY_URL,
-            data=payload, method="POST",
-            headers={"Content-Type": "application/json"},
-        )
-        ok = False
-        err_msg = ""
-        expire_at = None
-        try:
-            with urllib.request.urlopen(req, timeout=20) as r:
-                data = json.loads(r.read().decode("utf-8"))
-            if data.get("ok"):
-                expire_at = data.get("expire_at")
-                ok = True
-            else:
-                err_map = {
-                    "invalid": "兑换码无效，请检查后重试。",
-                    "used": "该兑换码已使用过。",
-                    "bound_other": "该兑换码已绑定在其他设备上。",
-                }
-                err_msg = err_map.get(data.get("err"), "激活失败：%s" % data.get("err"))
-        except urllib.error.HTTPError as e:
-            err_msg = "服务器错误（%d），请稍后再试。" % e.code
-        except Exception as e:
-            err_msg = "网络错误，请检查联网后重试。\n%s" % str(e)
-
+        """后台线程：本地离线校验兑换码。"""
+        ok, result = member_mod.verify_offline(code)
+        expire_at = result if ok else None
+        err_msg = result if not ok else ""
         self.after(0, lambda: self._activate_member_done(ok, err_msg, expire_at))
 
     def _activate_member_done(self, ok, err_msg, expire_at):
         self._activate_btn.config(state="normal")
         if ok and expire_at:
+            code = self._member_code_var.get().strip().upper()
             member_mod.set_expire_at(expire_at)
+            member_mod.mark_code_used(code)
             self._refresh_member_display()
             self.status("会员激活成功，有效期至 %s" % member_mod._fmt(expire_at))
             messagebox.showinfo(APP_NAME, "🎉 会员激活成功！\n有效期至 %s" % member_mod._fmt(expire_at))
