@@ -31,3 +31,5 @@ offline_codes.json
 # 交接/日志文档（SECRETS 含敏感信息，绝不可提交到 GitHub！）
 SECRETS.md
 WORKLOG.md
+# Claude 本地配置与计划（不入库）
+.claude/

@@ -309,6 +309,34 @@ ZH = {
     "把它变成可爱卡通风格，Q版动漫，色彩明亮":
         "把它变成可爱卡通风格，Q版动漫，色彩明亮",
 
+    # ---- AI 卡通 v2（风格方向 / 生成方式 / 拼豆友好化）----
+    "风格方向": "风格方向",
+    "🧸 奶油": "🧸 奶油",
+    "✍️ 写实": "✍️ 写实",
+    "👾 像素": "👾 像素",
+    "🖤 漫画": "🖤 漫画",
+    "🎨 简洁": "🎨 简洁",
+    "🌅 水彩": "🌅 水彩",
+    "生成方式": "生成方式",
+    "图生图（改我的照片）": "图生图（改我的照片）",
+    "文生图（凭空创作）": "文生图（凭空创作）",
+    "自动优化为适合拼豆（减少渐变/压色数/加粗轮廓）":
+        "自动优化为适合拼豆（减少渐变/压色数/加粗轮廓）",
+    "生成后自动优化为适合拼豆的图纸底图，可预览对比":
+        "生成后自动优化为适合拼豆的图纸底图，可预览对比",
+    "AI 生成中（约数十秒）": "AI 生成中（约数十秒）",
+    "拼豆友好化中…": "拼豆友好化中…",
+    "AI 生成 · 拼豆友好对比": "AI 生成 · 拼豆友好对比",
+    "对比：原始 vs 拼豆优化": "对比：原始 vs 拼豆优化",
+    "AI 原图 %d 色 → 拼豆优化 %d 色（更省豆、更好拼）":
+        "AI 原图 %d 色 → 拼豆优化 %d 色（更省豆、更好拼）",
+    "AI 原始图": "AI 原始图",
+    "拼豆优化版": "拼豆优化版",
+    "✅ 用拼豆优化版": "✅ 用拼豆优化版",
+    "用 AI 原始图": "用 AI 原始图",
+    "图生图模式下需要提供原图。": "图生图模式下需要提供原图。",
+    "文生图暂不支持，请用图生图。": "文生图暂不支持，请用图生图。",
+
     # ---- 会员弹窗 ----
     "💎 开通 / 激活会员": "💎 开通 / 激活会员",
     "（收款码图片待配置）": "（收款码图片待配置）",
@@ -712,6 +740,34 @@ EN = {
     "⏳ 准备中…": "⏳ Preparing…",
     "把它变成可爱卡通风格，Q版动漫，色彩明亮":
         "把它变成可爱卡通风格，Q版动漫，色彩明亮",
+
+    # ---- AI 卡通 v2（风格方向 / 生成方式 / 拼豆友好化）----
+    "风格方向": "Style",
+    "🧸 奶油": "🧸 Cream",
+    "✍️ 写实": "✍️ Realistic",
+    "👾 像素": "👾 Pixel",
+    "🖤 漫画": "🖤 Comic",
+    "🎨 简洁": "🎨 Flat",
+    "🌅 水彩": "🌅 Watercolor",
+    "生成方式": "Source",
+    "图生图（改我的照片）": "Image-to-image (edit my photo)",
+    "文生图（凭空创作）": "Text-to-image (create from scratch)",
+    "自动优化为适合拼豆（减少渐变/压色数/加粗轮廓）":
+        "Auto-optimize for beads (smooth gradients / fewer colors / bold outlines)",
+    "生成后自动优化为适合拼豆的图纸底图，可预览对比":
+        "Result is auto-optimized for beading, with a before/after preview",
+    "AI 生成中（约数十秒）": "AI generating (a few tens of seconds)",
+    "拼豆友好化中…": "Optimizing for beads…",
+    "AI 生成 · 拼豆友好对比": "AI result · bead-friendly compare",
+    "对比：原始 vs 拼豆优化": "Compare: original vs bead-optimized",
+    "AI 原图 %d 色 → 拼豆优化 %d 色（更省豆、更好拼）":
+        "AI original %d colors → bead-optimized %d colors (fewer beads, easier)",
+    "AI 原始图": "AI original",
+    "拼豆优化版": "Bead-optimized",
+    "✅ 用拼豆优化版": "✅ Use bead-optimized",
+    "用 AI 原始图": "Use AI original",
+    "图生图模式下需要提供原图。": "Image-to-image requires a source photo.",
+    "文生图暂不支持，请用图生图。": "Text-to-image isn't supported yet — use image-to-image.",
 
     # ---- 会员弹窗 ----
     "💎 开通 / 激活会员": "💎 Subscribe / Activate",

@@ -47,6 +47,23 @@ def _hex_lighter(hx, ratio=0.35):
                               int(b + (255 - b) * ratio))
 
 
+# --------------------------------------------------------------------------
+# ★ AI 卡通的 6 种风格方向（key = 变量值，label 走 i18n 翻译，prompt 是发给
+#    API 的提示词——算法数据，不翻译、不随界面语言变动）
+# --------------------------------------------------------------------------
+_AI_STYLES = (
+    ("cream",    "🧸 奶油", "把它变成奶油软萌风格，色彩柔和低饱和，圆润可爱，Q版动漫质感，浅奶油色背景"),
+    ("real",     "✍️ 写实", "保持写实还原，细节尽可能接近原照片，色彩自然，不要卡通化"),
+    ("pixel",    "👾 像素", "把它变成8-bit像素复古游戏风格，明显像素格，复古街机配色"),
+    ("comic",    "🖤 漫画", "把它变成漫画风格，粗黑描边，平涂色块，高对比，日漫质感"),
+    ("flat",     "🎨 简洁", "把它变成简洁扁平插画风格，大色块，少细节，纯色填充，现代插画"),
+    ("water",    "🌅 水彩", "把它变成水彩淡雅风格，柔和水彩晕染，清新透明，朦胧渐变"),
+)
+
+# 文生图预设主题（用于「文生图」模式没有图时快速开始，label 走 i18n）
+_AI_TXT2IMG_PRESETS = L.tr("把它变成可爱卡通风格，Q版动漫，色彩明亮")
+
+
 def resource_path(rel):
     """兼容 PyInstaller 打包后的资源路径。"""
     if hasattr(sys, "_MEIPASS"):
@@ -208,6 +225,13 @@ class Chip(tk.Canvas):
                             fill=base, outline="#D5DBE3", width=1)
         self.create_text(w / 2, h / 2 + 1, text=self._text, fill=self._fg,
                          font=self._font, anchor="center")
+
+    def set_color(self, color, fg=None):
+        """重画 chip 的主题色（用于选中高亮），fg 不传则保持原文字色。"""
+        self._color = color
+        if fg is not None:
+            self._fg = fg
+        self._draw()
 
 
 class SegmentedProgress(tk.Frame):
@@ -378,6 +402,7 @@ class App(tk.Tk):
         # 清空构建期缓存的控件引用，避免指向已销毁的 widget
         self.toggle_btn = None
         self._swatch_chips = []
+        self._style_chips = []
         self._done_items = []
         self._insp_photos = getattr(self, "_insp_photos", [])
         self._setup_style()
@@ -666,13 +691,44 @@ class App(tk.Tk):
                                        font=(FONT, 8, "underline"), cursor="hand2")
         self._ai_guide_link.pack(anchor=tk.W, pady=(0, 2))
         self._ai_guide_link.bind("<Button-1>", self._open_ai_guide)
-        promrow = tk.Frame(g5, bg=CARD); promrow.pack(fill=tk.X, pady=(2, 2))
-        tk.Label(promrow, text=L.tr("风格"), bg=CARD, fg=INK_SOFT, font=(FONT, 8)).pack(side=tk.LEFT)
+
+        # ---- AI 风格方向（点选，不用打字） ----
+        self._ai_style_var = tk.StringVar(value="cream")
+        style_row = tk.Frame(g5, bg=CARD); style_row.pack(fill=tk.X, pady=(4, 1))
+        tk.Label(style_row, text=L.tr("风格方向"), bg=CARD, fg=INK_SOFT,
+                 font=(FONT, 8, "bold")).pack(side=tk.LEFT, anchor=tk.N, padx=(0, 4))
+        self._style_chips = []
+        for key, label, color in _AI_STYLES:
+            chip = Chip(style_row, L.tr(label),
+                        lambda c=key: self._pick_ai_style(c),
+                        color="#E9EDF3", fg=INK_SOFT, font=(FONT, 8, "bold"))
+            chip.pack(side=tk.LEFT, padx=(0, 3), pady=2)
+            if key == self._ai_style_var.get():
+                chip.set_color("#8E6BDB", "#FFFFFF")
+            self._style_chips.append((key, chip))
+
+        # ---- 生成方式：图生图 / 文生图 ----
+        self._ai_mode_var = tk.StringVar(value="img2img")
+        mode_row = tk.Frame(g5, bg=CARD); mode_row.pack(fill=tk.X, pady=(2, 1))
+        tk.Label(mode_row, text=L.tr("生成方式"), bg=CARD, fg=INK_SOFT,
+                 font=(FONT, 8, "bold")).pack(side=tk.LEFT, padx=(0, 4))
+        for key, label in (("img2img", L.tr("图生图（改我的照片）")),
+                           ("txt2img", L.tr("文生图（凭空创作）"))):
+            rb = ttk.Radiobutton(mode_row, text=label, value=key,
+                                 variable=self._ai_mode_var)
+            rb.pack(side=tk.LEFT, padx=(0, 8))
+        # 主题/提示词输入（图生图也保留，便于给 AI 更具体的指令）
         self._ai_prompt_var = tk.StringVar(
-            value="把它变成可爱卡通风格，Q版动漫，色彩明亮")
-        self._ai_prompt_entry = ttk.Entry(promrow, textvariable=self._ai_prompt_var,
-                                          width=24)
-        self._ai_prompt_entry.pack(side=tk.LEFT, padx=(4, 0))
+            value=L.tr("把它变成可爱卡通风格，Q版动漫，色彩明亮"))
+        self._ai_prompt_entry = ttk.Entry(g5, textvariable=self._ai_prompt_var,
+                                          width=26)
+        self._ai_prompt_entry.pack(fill=tk.X, padx=(2, 0), pady=(3, 2))
+
+        # ---- ★ 拼豆友好化（核心卖点，开关默认开） ----
+        self._ai_friendly_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(g5, text=L.tr("自动优化为适合拼豆（减少渐变/压色数/加粗轮廓）"),
+                        variable=self._ai_friendly_var).pack(anchor=tk.W, pady=(2, 0))
+
         brow = tk.Frame(g5, bg=CARD); brow.pack(fill=tk.X, pady=(4, 0))
         self._ai_btn = RoundedButton(brow, L.tr("AI 卡通化"), self._ai_cartoon,
                                      color="#8E6BDB", fg="#FFFFFF",
@@ -680,7 +736,7 @@ class App(tk.Tk):
         self._ai_btn.pack(side=tk.LEFT)
         self._ai_status = tk.Label(brow, text="", bg=CARD, fg=TEAL, font=(FONT, 8))
         self._ai_status.pack(side=tk.LEFT, padx=8)
-        tk.Label(g5, text=L.tr("生成卡通图后替换原图，再点「生成图纸」即可"),
+        tk.Label(g5, text=L.tr("生成后自动优化为适合拼豆的图纸底图，可预览对比"),
                  bg=CARD, fg=INK_FAINT, font=(FONT, 8)).pack(anchor=tk.W, pady=(2, 0))
 
         # ⑥ 会员（按钮，点开弹窗显示收款码 + 兑换码激活）
@@ -1471,12 +1527,25 @@ class App(tk.Tk):
             self.status("激活失败：%s" % err_msg)
             messagebox.showerror(APP_NAME, err_msg)
 
+    def _pick_ai_style(self, key):
+        """点击风格 chip：切换选中高亮 + 填入对应的预设提示词。"""
+        self._ai_style_var.set(key)
+        for k, chip in self._style_chips:
+            if k == key:
+                chip.set_color("#8E6BDB", "#FFFFFF")
+            else:
+                chip.set_color("#E9EDF3", INK_SOFT)
+        _, _, prompt = next((s for s in _AI_STYLES if s[0] == key),
+                            _AI_STYLES[0])
+        self._ai_prompt_var.set(prompt)
+
     def _ai_cartoon(self):
-        """AI 卡通化入口：校验后开线程调 API，成功后替换原图。
+        """AI 卡通化入口：校验后开线程调 API，成功后可选「拼豆友好化」，再弹对比预览。
         等待期间显示阶段文字 + 转动符号（非百分比进度，接口不返回进度）。"""
         if self._ai_cartoon_running:
             return
-        if self.base is None:
+        mode = self._ai_mode_var.get()
+        if mode == "img2img" and self.base is None:
             messagebox.showinfo(APP_NAME, L.tr("请先打开一张图片。"))
             return
         key = self._ai_key_var.get().strip()
@@ -1484,7 +1553,10 @@ class App(tk.Tk):
             self._ai_status.config(text=L.tr("请先填写 API Key"), fg=BEAD)
             messagebox.showwarning(APP_NAME, "请先在上方填写 SenseNova API Key。\n在 platform.sensenova.cn 获取。")
             return
-        prompt = self._ai_prompt_var.get().strip() or L.tr("把它变成可爱卡通风格，Q版动漫，色彩明亮")
+        # 收集当前参数（style 名 + 用户可改的 prompt + 图/文生图 + 友好化开关）
+        style_key = self._ai_style_var.get()
+        prompt = self._ai_prompt_var.get().strip()
+        friendly = self._ai_friendly_var.get()
         self._ai_cartoon_running = True
         self._ai_spinner_idx = 0
         self._ai_phase = L.tr("准备中…")
@@ -1494,7 +1566,8 @@ class App(tk.Tk):
         self.status(L.tr("AI 卡通化中…"))
         self.update_idletasks()
         threading.Thread(
-            target=self._ai_cartoon_worker, args=(self.base, key, prompt),
+            target=self._ai_cartoon_worker,
+            args=(self.base, key, prompt, style_key, mode, friendly),
             daemon=True).start()
         self._ai_spinner_tick()
 
@@ -1510,21 +1583,43 @@ class App(tk.Tk):
         self.status("AI 卡通化中… %s" % phase)
         self.after(450, self._ai_spinner_tick)
 
-    def _ai_cartoon_worker(self, image, key, prompt):
+    def _ai_cartoon_worker(self, image, key, prompt, style_key, mode, friendly):
         try:
-            self.after(0, lambda: setattr(self, "_ai_phase", L.tr("正在生成，请稍候（约数十秒）")))
-            result = be.ai_cartoonize(image, api_key=key, prompt=prompt)
+            self.after(0, lambda: setattr(self, "_ai_phase", L.tr("AI 生成中（约数十秒）")))
+            if mode == "txt2img":
+                # 文生图：无底图，用 prompt 直接生成（若接口不支持会在 ai_cartoonize 里抛错）
+                result = be.ai_cartoonize(None, api_key=key, prompt=prompt,
+                                          mode="txt2img")
+            else:
+                result = be.ai_cartoonize(image, api_key=key, prompt=prompt,
+                                          mode="img2img")
+            # ★ 拼豆友好化
+            friendly_result = None
+            if friendly and result is not None:
+                self.after(0, lambda: setattr(self, "_ai_phase", L.tr("拼豆友好化中…")))
+                pal_hexes = None
+                try:
+                    name = self.pal_var.get() if hasattr(self, "pal_var") else ""
+                    pal = self._find_palette(name) if name else None
+                    if pal:
+                        pal_hexes = [palettes.rgba_hex(n) for n in pal["colors"]]
+                except Exception:
+                    pal_hexes = None
+                friendly_result = be.bead_friendly(
+                    result, palette_hexes=pal_hexes, max_colors=18)
         except be.AICartoonError as e:
             err = str(e)
             result = None
+            friendly_result = None
         except Exception as e:
             err = "AI 卡通生成失败：%s" % str(e)
             result = None
+            friendly_result = None
         else:
             err = None
-        self.after(0, lambda: self._ai_cartoon_done(result, err))
+        self.after(0, lambda: self._ai_cartoon_done(result, friendly_result, err))
 
-    def _ai_cartoon_done(self, result, err):
+    def _ai_cartoon_done(self, result, friendly_result, err):
         self._ai_cartoon_running = False
         self._ai_btn.set_state(False)
         self._ai_btn.set_text(L.tr("AI 卡通化"))
@@ -1533,11 +1628,60 @@ class App(tk.Tk):
             self.status(L.tr("AI 卡通化失败"))
             messagebox.showerror(APP_NAME, err)
             return
+        # 拼豆友好化开启 → 弹对比预览窗口，让用户选一张作为底图
+        if friendly_result is not None:
+            ready, orig_colors, opt_colors = friendly_result
+            apply_opt = self._show_ai_preview(result, ready, orig_colors,
+                                              opt_colors)
+            chosen = ready if apply_opt else result
+        else:
+            chosen = result
         self._ai_status.config(text=L.tr("✔ OK 已替换原图"), fg=TEAL)
-        self.base = result.convert("RGBA")
+        self.base = chosen.convert("RGBA")
         self.show_pil(self.base)
         self.status(L.tr("AI 卡通化完成，已替换原图；可点击「生成图纸」"))
-        # 若已有图纸，用卡通图重算预览（可选：让用户自己点生成更明确，此处仅刷新原图）
+
+    def _show_ai_preview(self, orig, opt, orig_colors, opt_colors):
+        """对比预览弹窗：左=AI 原始图，右=拼豆优化版，带色数对比。返回是否选优化版。"""
+        dlg = tk.Toplevel(self)
+        dlg.title(L.tr("AI 生成 · 拼豆友好对比"))
+        dlg.configure(bg=BG)
+        dlg.geometry("760x540")
+        dlg.transient(self)
+        dlg.grab_set()
+        result = {"use_opt": True}
+        tk.Label(dlg, text=L.tr("对比：原始 vs 拼豆优化"), bg=BG, fg=INK,
+                 font=(FONT, 12, "bold")).pack(pady=(12, 4))
+        tk.Label(dlg, text=L.tr("AI 原图 %d 色 → 拼豆优化 %d 色（更省豆、更好拼）")
+                 % (orig_colors, opt_colors), bg=BG, fg="#B9842C",
+                 font=(FONT, 10, "bold")).pack()
+        two = tk.Frame(dlg, bg=BG); two.pack(fill=tk.BOTH, expand=True, padx=14)
+        for side, img, label in (("left", orig, L.tr("AI 原始图")),
+                                 ("right", opt, L.tr("拼豆优化版"))):
+            frm = tk.Frame(two, bg=BG); frm.pack(side=tk.LEFT, expand=True,
+                                                 fill=tk.BOTH, padx=5)
+            tk.Label(frm, text=label, bg=BG, fg=INK, font=(FONT, 10, "bold")
+                     ).pack()
+            # 缩略图
+            th = img.copy()
+            th.thumbnail((320, 320))
+            photo = ImageTk.PhotoImage(th)
+            lbl = tk.Label(frm, image=photo, bg=BG)
+            lbl.image = photo
+            lbl.pack(expand=True)
+        btn_row = tk.Frame(dlg, bg=BG); btn_row.pack(pady=12)
+        RoundedButton(btn_row, L.tr("✅ 用拼豆优化版"), lambda: self._preview_choice(dlg, result, True),
+                      color="#8E6BDB", fg="#FFFFFF", font=(FONT, 10, "bold")).pack(
+                          side=tk.LEFT, padx=8)
+        RoundedButton(btn_row, L.tr("用 AI 原始图"), lambda: self._preview_choice(dlg, result, False),
+                      color="#E9EDF3", fg=INK_SOFT, font=(FONT, 10)).pack(
+                          side=tk.LEFT, padx=8)
+        self.wait_window(dlg)
+        return result["use_opt"]
+
+    def _preview_choice(self, dlg, result, use_opt):
+        result["use_opt"] = use_opt
+        dlg.destroy()
 
     def generate(self):
         if self.base is None:

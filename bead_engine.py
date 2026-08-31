@@ -775,12 +775,13 @@ def _prep_image_for_ai(image: Image.Image) -> Image.Image:
     return img
 
 
-def ai_cartoonize(image: Image.Image, api_key: str, prompt: str = None) -> Image.Image:
-    """调用 SenseNova 图像编辑模型，把原图变成卡通风格，返回 PIL.Image(RGB)。
+def ai_cartoonize(image, api_key, prompt=None, mode="img2img"):
+    """调用 SenseNova 图像模型，把原图变成风格化图（图生图）或凭空生成（文生图）。
 
-    - image: 原图（任意模式）。内部会预处理到接口规格。
+    - image: 原图（图生图模式用；文生图模式传 None）。
     - api_key: SenseNova API key（Bearer 鉴权）。
     - prompt: 风格提示词。
+    - mode: "img2img"（图像编辑 / edits）或 "txt2img"（文生图 / generations，视接口支持）。
     - 失败抛 AICartoonError（含服务端错误信息）。
     """
     import base64 as _base64
@@ -790,19 +791,9 @@ def ai_cartoonize(image: Image.Image, api_key: str, prompt: str = None) -> Image
         raise AICartoonError(L.tr("未配置 API key，请先在「卡通化」面板填写。"))
 
     prompt = prompt or L.tr("把它变成可爱卡通风格，Q版动漫，色彩明亮")
-    prep = _prep_image_for_ai(image)
-
-    buf = __import__("io").BytesIO()
-    prep.save(buf, format="PNG")
-    raw = buf.getvalue()
-    if len(raw) > _AI_MAX_MB * 1024 * 1024:
-        raise AICartoonError(L.tr("预处理后图片仍超过 %dMB，请换一张小图。") % _AI_MAX_MB)
-    b64 = _base64.b64encode(raw).decode("ascii")
-    image_url = "data:image/png;base64," + b64
 
     payload = {
         "model": SENSENOVA_MODEL,
-        "images": [{"image_url": image_url}],
         "prompt": prompt,
         "n": 1,
         "size": "auto",
@@ -810,13 +801,30 @@ def ai_cartoonize(image: Image.Image, api_key: str, prompt: str = None) -> Image
         "prompt_extend": True,
         "response_format": "b64_json",
     }
+    url = SENSENOVA_IMAGE_URL
+    if mode == "txt2img":
+        # 福利接口：如果后台有 `images/generations`（文生图）就用它
+        url = SENSENOVA_IMAGE_URL.replace("/edits", "/generations")
+    else:
+        if image is None:
+            raise AICartoonError(L.tr("图生图模式下需要提供原图。"))
+        prep = _prep_image_for_ai(image)
+        buf = __import__("io").BytesIO()
+        prep.save(buf, format="PNG")
+        raw = buf.getvalue()
+        if len(raw) > _AI_MAX_MB * 1024 * 1024:
+            raise AICartoonError(L.tr("预处理后图片仍超过 %dMB，请换一张小图。") % _AI_MAX_MB)
+        b64 = _base64.b64encode(raw).decode("ascii")
+        image_url = "data:image/png;base64," + b64
+        payload["images"] = [{"image_url": image_url}]
+
     headers = {
         "Authorization": "Bearer " + api_key.strip(),
         "Content-Type": "application/json",
     }
     try:
         resp = _requests.post(
-            SENSENOVA_IMAGE_URL, headers=headers, json=payload, timeout=300
+            url, headers=headers, json=payload, timeout=300
         )
     except _requests.exceptions.Timeout:
         raise AICartoonError(L.tr("请求超时（生成较慢），请重试。"))
@@ -843,6 +851,77 @@ def ai_cartoonize(image: Image.Image, api_key: str, prompt: str = None) -> Image
     except Exception as e:
         raise AICartoonError(L.tr("返回图片解析失败：%s") % str(e))
 
-    import io as _io
-    result = Image.open(_io.BytesIO(img_bytes)).convert("RGB")
+    result = Image.open(__import__("io").BytesIO(img_bytes)).convert("RGB")
     return result
+
+
+# --------------------------------------------------------------------------
+# ★ 拼豆友好化（Bead-Friendly）：让 AI 生成的图「拼出来好看」
+# --------------------------------------------------------------------------
+
+def bead_friendly(image: Image.Image, palette_hexes=None, max_colors=18,
+                  edge_size=2, smooth_level=2):
+    """把一张图（通常是 AI 生成的）优化为「适合拼豆」的版本。
+
+    与通用生图工具（豆包等）区分开的核心步骤——它不知道色卡和拼豆规则，
+    而这个函数知道：
+      1. 边缘保留平滑（减少细碎噪点，避免拼出来糊）
+      2. K-Means 压色到目标色数（合并相近色，减少耗材种类）
+      3. 映射到用户当前色卡（保证豆子能买到，颜色对得上号）
+      4. 加粗轮廓边缘（拼豆更需要清晰的色块边界）
+    返回 (优化图, 原始色数, 优化后色数)。palette_hexes 为色卡 hex 列表；
+    不给则只做压色 + 描边，不映射色卡（适合无色卡约束的场景）。
+    """
+    bgr = _cv2img(image)
+    if bgr.ndim == 3 and bgr.shape[2] == 4:
+        bgr = bgr[:, :, :3].copy()          # 丢弃 alpha，bilateralFilter 只要 8UC3
+    h, w = bgr.shape[:2]
+
+    # 1. 边缘保留平滑
+    smooth = bgr.copy()
+    for _ in range(smooth_level):
+        smooth = cv2.bilateralFilter(smooth, d=9, sigmaColor=18, sigmaSpace=8)
+
+    # 2. K-Means 压色（平涂感）
+    reshaped = smooth.reshape(-1, 3).astype(np.float32)
+    k = max(8, min(24, (h * w) // 20000))
+    crit = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 20, 1.0)
+    _, labels, centers = cv2.kmeans(reshaped, k, None, crit, 5,
+                                    cv2.KMEANS_PP_CENTERS)
+    quantized = centers[labels.flatten()].reshape(h, w, 3).astype(np.uint8)
+
+    # 3. 映射到色卡（若给了 palette_hexes），否则只压色不映射
+    if palette_hexes:
+        pts = quantized.reshape(-1, 3).astype(np.float32)
+        cand = _pick_candidates(pts, palette_hexes, max_colors)
+        cand_lab = _to_lab(np.array([hex_to_rgb(h) for h in cand],
+                                    dtype=np.float32))
+        q = quantized.reshape(-1, 3)
+        lab = _to_lab(q.astype(np.float32)).reshape(-1, 3)
+        d = np.linalg.norm(lab[:, None, :] - cand_lab[None, :, :], axis=2)
+        nearest = np.array([hex_to_rgb(cand[i]) for i in np.argmin(d, axis=1)],
+                           dtype=np.uint8)
+        quantized = nearest.reshape(h, w, 3)
+
+    # 4. 加粗黑边（拼豆需要清晰的色块边界）
+    gray = cv2.cvtColor(smooth, cv2.COLOR_BGR2GRAY)
+    gray_smooth = cv2.medianBlur(gray, 5)
+    edges = cv2.adaptiveThreshold(gray_smooth, 255,
+                                  cv2.ADAPTIVE_THRESH_MEAN_C,
+                                  cv2.THRESH_BINARY, blockSize=9, C=2)
+    ksize = max(1, edge_size)
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (ksize, ksize))
+    edges = cv2.dilate(255 - edges, kernel)
+    edges = 255 - edges
+    edges_3c = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
+    result_arr = cv2.bitwise_and(quantized, edges_3c)
+
+    ready = _pil(result_arr, "RGB")
+    # 色数统计（NEAREST 采样，避免插值造出新颜色而虚高）
+    def _sample_colors(img):
+        small = img.convert("RGB").resize((96, 96), Image.NEAREST)
+        flat = np.asarray(small).reshape(-1, 3)
+        return len(np.unique(flat, axis=0))
+    orig_colors = _sample_colors(image)
+    opt_colors = _sample_colors(ready)
+    return ready, orig_colors, opt_colors
