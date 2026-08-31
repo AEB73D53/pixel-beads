@@ -28,5 +28,6 @@ shot_exe.png
 server/codes.json
 server/codes.txt
 offline_codes.json
-# 交接文档（含敏感信息，绝不可提交到 GitHub！）
-HANDOFF.md
+# 交接/日志文档（SECRETS 含敏感信息，绝不可提交到 GitHub！）
+SECRETS.md
+WORKLOG.md
