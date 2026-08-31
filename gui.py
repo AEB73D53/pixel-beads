@@ -387,15 +387,16 @@ class App(tk.Tk):
         self.status(L.tr("打开一张照片，把它变成拼豆图纸"))
 
     def _toggle_lang(self):
-        """切换中/英。写盘后立即重建界面（set_lang 会触发上面的回调）。"""
-        s = _load_settings()
-        L.save_lang_to_settings(s, "en" if self._lang == "zh" else "zh")
+        """切换中/英。先真正切换语言（set_lang 触发整界面重建），再写盘记住。"""
+        target = "en" if self._lang == "zh" else "zh"
+        L.set_lang(target)          # 改模块语言并触发 _rebuild_ui_on_lang 重建界面
+        self._lang = L.get_lang()   # 回调已把 self._lang 更新，这里再兜底读回
         try:
+            s = _load_settings()
+            L.save_lang_to_settings(s, self._lang)
             _save_settings(s)
         except Exception:
             pass
-        self._lang = L.get_lang()
-        L.set_lang(self._lang)
         self.title(L.tr("拼豆助手 —— 照片变拼豆图纸"))
 
     def _setup_style(self):

@@ -491,7 +491,7 @@ EN = {
     "兑换码": "Redemption code",
 
     # ---- 主按钮与进度 ----
-    "生 成 图 纸": "GEN ERATE",
+    "生 成 图 纸": "Generate Pattern",
     "生成中…": "Working…",
     "网格化": "Grid",
     "颜色映射": "Color map",
