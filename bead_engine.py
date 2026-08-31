@@ -7,6 +7,7 @@ import numpy as np
 import cv2
 from PIL import Image, ImageDraw, ImageFont
 import palettes
+import i18n as L
 
 
 # --------------------------------------------------------------------------
@@ -367,7 +368,7 @@ def map_to_palette(cells, colNames, max_colors, bg_overwrite=None, image=None):
 # --------------------------------------------------------------------------
 
 def render_pattern(cells, result, used_colors, grid_cols, grid_rows,
-                   cell_px=22, page_margin=18, title="拼豆图纸",
+                   cell_px=22, page_margin=18, title=L.tr("拼豆图纸"),
                    dpi_scale=1.0, font_seed=5):
     """渲染整张图纸（含格子主图 + 编号图 + 色卡图例 + 编号图例），返回 PIL Image。"""
     P = max(2, int(cell_px * dpi_scale))
@@ -466,7 +467,7 @@ def _draw_legend(sheet, used, width, y0, P, font_seed, margin):
     d = ImageDraw.Draw(sheet)
     ft = _load_font(max(12, P // 2))
     fh = ft.size
-    d.text((margin, y0), "色卡图例（数字为每色所需颗数）", fill=(40, 40, 40),
+    d.text((margin, y0), L.tr("色卡图例（数字为每色所需颗数）"), fill=(40, 40, 40),
            font=_load_font(max(13, P // 2)))
     y0 += int(fh * 1.6)
 
@@ -598,7 +599,7 @@ def _draw_number_legend(sheet, used_colors, width, y0, P, font_seed, margin):
     ft = _load_font(max(12, P // 2))
     fh = ft.size
     title_ft = _load_font(max(13, P // 2))
-    d.text((margin, y0), "编号图例（数字对应拼豆颜色）", fill=(40, 40, 40),
+    d.text((margin, y0), L.tr("编号图例（数字对应拼豆颜色）"), fill=(40, 40, 40),
            font=title_ft)
     y0 += int(fh * 1.6)
 
@@ -786,16 +787,16 @@ def ai_cartoonize(image: Image.Image, api_key: str, prompt: str = None) -> Image
     import requests as _requests
 
     if not api_key or not api_key.strip():
-        raise AICartoonError("未配置 API key，请先在「卡通化」面板填写。")
+        raise AICartoonError(L.tr("未配置 API key，请先在「卡通化」面板填写。"))
 
-    prompt = prompt or "把它变成可爱卡通风格，Q版动漫，色彩明亮"
+    prompt = prompt or L.tr("把它变成可爱卡通风格，Q版动漫，色彩明亮")
     prep = _prep_image_for_ai(image)
 
     buf = __import__("io").BytesIO()
     prep.save(buf, format="PNG")
     raw = buf.getvalue()
     if len(raw) > _AI_MAX_MB * 1024 * 1024:
-        raise AICartoonError("预处理后图片仍超过 %dMB，请换一张小图。" % _AI_MAX_MB)
+        raise AICartoonError(L.tr("预处理后图片仍超过 %dMB，请换一张小图。") % _AI_MAX_MB)
     b64 = _base64.b64encode(raw).decode("ascii")
     image_url = "data:image/png;base64," + b64
 
@@ -818,29 +819,29 @@ def ai_cartoonize(image: Image.Image, api_key: str, prompt: str = None) -> Image
             SENSENOVA_IMAGE_URL, headers=headers, json=payload, timeout=300
         )
     except _requests.exceptions.Timeout:
-        raise AICartoonError("请求超时（生成较慢），请重试。")
+        raise AICartoonError(L.tr("请求超时（生成较慢），请重试。"))
     except _requests.exceptions.ConnectionError:
-        raise AICartoonError("网络连接失败，请检查网络后重试。")
+        raise AICartoonError(L.tr("网络连接失败，请检查网络后重试。"))
     except _requests.exceptions.RequestException as e:
-        raise AICartoonError("网络请求失败：%s" % str(e))
+        raise AICartoonError(L.tr("网络请求失败：%s") % str(e))
 
     if resp.status_code != 200:
         try:
             msg = resp.json().get("error", {}).get("message", resp.text[:200])
         except Exception:
             msg = resp.text[:200]
-        raise AICartoonError("接口返回错误(%d)：%s" % (resp.status_code, msg))
+        raise AICartoonError(L.tr("接口返回错误(%d)：%s") % (resp.status_code, msg))
 
     try:
         data = resp.json().get("data")
         if not data or not data[0].get("b64_json"):
-            raise AICartoonError("接口返回结果异常（无图片）。")
+            raise AICartoonError(L.tr("接口返回结果异常（无图片）。"))
         img_b64 = data[0]["b64_json"]
         img_bytes = _base64.b64decode(img_b64)
     except AICartoonError:
         raise
     except Exception as e:
-        raise AICartoonError("返回图片解析失败：%s" % str(e))
+        raise AICartoonError(L.tr("返回图片解析失败：%s") % str(e))
 
     import io as _io
     result = Image.open(_io.BytesIO(img_bytes)).convert("RGB")

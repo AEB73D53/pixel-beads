@@ -17,6 +17,7 @@ import base64
 import hmac
 import json
 import os
+import i18n as L
 import platform
 import uuid
 from datetime import datetime, timezone
@@ -24,7 +25,7 @@ from datetime import datetime, timezone
 import sys
 
 # 会员价格文案（展示用）
-PRICE = "9.9 元/月 · 29 元/年"
+PRICE = L.tr("9.9 元/月 · 29 元/年")
 
 # 码表文件：打包进 exe（离线校验）
 _CODES_FILE = "offline_codes.json"
@@ -65,7 +66,7 @@ _CODE_TABLE = _load_code_table()
 
 
 def _hmac_key(secret: str, code: str) -> str:
-    """与服务端 worker.js / gen_offline_codes.py 一致的 HMAC-SHA256 前 16 位。"""
+    """与 server/gen_offline_codes.py 一致的 HMAC-SHA256 前 16 位。"""
     return hmac.new(secret.encode(), code.upper().encode(), hashlib.sha256).hexdigest()[:16]
 
 
@@ -73,18 +74,18 @@ def verify_offline(code: str) -> tuple[bool, str]:
     """校验一个兑换码。返回 (是否有效, 到期 ISO 时间或错误提示)。"""
     code = (code or "").strip().upper()
     if not code:
-        return False, "请输入兑换码。"
+        return False, L.tr("请输入兑换码。")
     # 本机已用过的码（防同设备重复激活）
     s = _load_settings()
     used = (s.get("member") or {}).get("used_codes", [])
     if code in used:
-        return False, "该兑换码在本机已使用过。"
+        return False, L.tr("该兑换码在本机已使用过。")
     # 计算 HMAC 并在表里查找匹配
     k = _hmac_key(_SECRET, code)
     for e in _CODE_TABLE.get("entries", []):
         if e.get("key") == k:
             return True, e.get("expire_at") or ""
-    return False, "兑换码无效，请检查后重试。"
+    return False, L.tr("兑换码无效，请检查后重试。")
 
 
 def mark_code_used(code: str) -> None:
