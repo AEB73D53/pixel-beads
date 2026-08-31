@@ -488,6 +488,9 @@ class App(tk.Tk):
              color="#FFFFFF", fg="#2B3440").pack(side=tk.LEFT, padx=(0, 8))
         Chip(tools, L.tr("导出 PDF"), self.export_pdf,
              color="#FFFFFF", fg="#2B3440").pack(side=tk.LEFT, padx=(0, 8))
+        Chip(tools, L.tr("导出拼豆板"), self.export_to_board,
+             color="#2E8C83", fg="#FFFFFF", font=(FONT, 9, "bold")).pack(
+                 side=tk.LEFT, padx=(0, 8))
         Chip(tools, L.tr("拼豆灵感"), self.open_inspiration,
              color=BEAD, fg="#FFFFFF", font=(FONT, 9, "bold")).pack(
                  side=tk.LEFT, padx=(0, 8))
@@ -2164,6 +2167,113 @@ class App(tk.Tk):
             self.status(f"{L.tr('PDF 已导出：')}{path}{L.tr('（共 ')}{n}{L.tr(' 页）')}")
         except Exception as e:
             messagebox.showerror(APP_NAME, f"{L.tr('导出 PDF 失败：')}{e}")
+
+    # ---------------------------------------------------------- 拼豆板（WS2812 串口）
+    def export_to_board(self):
+        """导出到 WS2812 拼豆板：把图纸打包成协议帧，经串口发给 STM32。
+
+        弹窗让用户选串口 + 波特率，预览帧信息（行/列/灯数），点「发送」写入串口。
+        """
+        import serial_out as so
+        if self.result is None:
+            messagebox.showinfo(APP_NAME, L.tr("还没有可导出的图纸，先点「生成图纸」。"))
+            return
+        rows, cols = self.grid_rows, self.grid_cols
+        frame = so.build_frame(self.result, rows, cols)
+        stats = so.frame_stats(frame)
+        if not stats["ok"]:
+            messagebox.showerror(APP_NAME, L.tr("图纸数据打包失败，请重试。"))
+            return
+
+        dlg = tk.Toplevel(self)
+        dlg.configure(bg=BG)
+        dlg.title(L.tr("导出到拼豆板（WS2812）"))
+        dlg.transient(self)
+        dlg.resizable(False, False)
+        dlg.geometry("460x360")
+        tk.Label(dlg, text=L.tr("把图纸发给 WS2812 拼豆板（STM32）"),
+                 bg=BG, fg=INK, font=(FONT, 11, "bold")).pack(
+                     anchor=tk.W, padx=18, pady=(14, 4))
+
+        # 帧信息预览
+        info = tk.Frame(dlg, bg=BG)
+        info.pack(fill=tk.X, padx=18, pady=(0, 8))
+        tk.Label(info, text=L.tr("图纸：%d × %d　共 %d 颗灯　点亮 %d 颗")
+                 % (rows, cols, stats["beads"], stats["lit"]),
+                 bg=BG, fg="#B9842C", font=(FONT, 10, "bold")).pack(anchor=tk.W)
+        tk.Label(info, text=L.tr("数据 %d 字节 · 每颗 3 字节(GRB) · 含校验")
+                 % stats["bytes"], bg=BG, fg=INK_SOFT,
+                 font=(FONT, 8)).pack(anchor=tk.W, pady=(2, 0))
+
+        # 串口选择
+        port_row = tk.Frame(dlg, bg=BG); port_row.pack(fill=tk.X, padx=18, pady=(6, 4))
+        tk.Label(port_row, text=L.tr("串口"), bg=BG, fg=INK,
+                 font=(FONT, 9)).pack(side=tk.LEFT)
+        self._board_port_var = tk.StringVar()
+        ports = so.list_ports()
+        labels = [f"{dev}  {desc}" if desc else dev for dev, desc in ports]
+        self._board_port_box = ttk.Combobox(port_row, textvariable=self._board_port_var,
+                                            values=labels, width=22)
+        self._board_port_box.pack(side=tk.LEFT, padx=(8, 0))
+        refresh = Chip(port_row, "↻", lambda: self._refresh_board_ports(so),
+                       color="#E9EDF3", fg=INK_SOFT, font=(FONT, 8, "bold"))
+        refresh.pack(side=tk.LEFT, padx=(6, 0))
+        if not ports:
+            self._board_port_box.set(L.tr("（未检测到串口）"))
+
+        # 波特率
+        baud_row = tk.Frame(dlg, bg=BG); baud_row.pack(fill=tk.X, padx=18, pady=(4, 4))
+        tk.Label(baud_row, text=L.tr("波特率"), bg=BG, fg=INK,
+                 font=(FONT, 9)).pack(side=tk.LEFT)
+        self._board_baud_var = tk.StringVar(value=str(so.DEFAULT_BAUD))
+        ttk.Combobox(baud_row, textvariable=self._board_baud_var, width=12,
+                     values=["9600", "57600", "115200", "230400", "460800"]
+                     ).pack(side=tk.LEFT, padx=(8, 0))
+
+        tk.Label(dlg, text=L.tr("提示：连接拼豆板后点「刷新」，选好串口再发送"),
+                 bg=BG, fg=INK_FAINT, font=(FONT, 8)).pack(
+                     anchor=tk.W, padx=18, pady=(4, 0))
+
+        # 发送按钮
+        btn_row = tk.Frame(dlg, bg=BG); btn_row.pack(pady=14)
+        RoundedButton(btn_row, L.tr("发送到拼豆板"), lambda: self._do_send_board(dlg, so, frame),
+                      color="#2E8C83", fg="#FFFFFF", font=(FONT, 10, "bold")).pack(
+                          side=tk.LEFT)
+        Chip(btn_row, L.tr("取消"), dlg.destroy, color=CARD, fg=INK_SOFT,
+             font=(FONT, 9)).pack(side=tk.LEFT, padx=(10, 0))
+
+    def _refresh_board_ports(self, so):
+        """刷新串口下拉列表。"""
+        ports = so.list_ports()
+        labels = [f"{dev}  {desc}" if desc else dev for dev, desc in ports]
+        self._board_port_box.configure(values=labels)
+        if labels:
+            self._board_port_var.set(labels[0])
+        else:
+            self._board_port_var.set(L.tr("（未检测到串口）"))
+
+    def _do_send_board(self, dlg, so, frame):
+        """真正把帧写到串口。"""
+        raw_port = self._board_port_var.get().strip()
+        # 去掉下拉里可能带上的描述（"COM3  描述文字" -> "COM3"）
+        port = raw_port.split()[0] if raw_port else ""
+        if not port or "（" in raw_port:
+            messagebox.showwarning(APP_NAME, L.tr("请先选择一个串口。"))
+            return
+        try:
+            baud = int(self._board_baud_var.get().strip())
+        except Exception:
+            baud = so.DEFAULT_BAUD
+        try:
+            self.status(L.tr("正在发送到拼豆板…"))
+            self.update_idletasks()
+            so.send_frame(frame, port, baud)
+            self.status(L.tr("已发送 %d 字节到 %s") % (len(frame), port))
+            messagebox.showinfo(APP_NAME, L.tr("已发送到拼豆板 %s") % port)
+            dlg.destroy()
+        except Exception as e:
+            self.status(L.tr("发送失败"))
+            messagebox.showerror(APP_NAME, f"{L.tr('发送失败：')}{e}")
 
     # ---------------------------------------------------------- 拼豆灵感
     def open_inspiration(self, page=0):

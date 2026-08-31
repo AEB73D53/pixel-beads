@@ -294,6 +294,25 @@ ZH = {
     "拼豆耗材清单.xlsx": "拼豆耗材清单.xlsx",
     "拼豆耗材清单": "拼豆耗材清单",
 
+    # ---- 拼豆板（WS2812 串口导出）----
+    "导出拼豆板": "导出拼豆板",
+    "导出到拼豆板（WS2812）": "导出到拼豆板（WS2812）",
+    "把图纸发给 WS2812 拼豆板（STM32）": "把图纸发给 WS2812 拼豆板（STM32）",
+    "图纸：%d × %d　共 %d 颗灯　点亮 %d 颗": "图纸：%d × %d　共 %d 颗灯　点亮 %d 颗",
+    "数据 %d 字节 · 每颗 3 字节(GRB) · 含校验": "数据 %d 字节 · 每颗 3 字节(GRB) · 含校验",
+    "串口": "串口",
+    "波特率": "波特率",
+    "（未检测到串口）": "（未检测到串口）",
+    "提示：连接拼豆板后点「刷新」，选好串口再发送": "提示：连接拼豆板后点「刷新」，选好串口再发送",
+    "发送到拼豆板": "发送到拼豆板",
+    "图纸数据打包失败，请重试。": "图纸数据打包失败，请重试。",
+    "请先选择一个串口。": "请先选择一个串口。",
+    "正在发送到拼豆板…": "正在发送到拼豆板…",
+    "已发送 %d 字节到 %s": "已发送 %d 字节到 %s",
+    "已发送到拼豆板 %s": "已发送到拼豆板 %s",
+    "发送失败：": "发送失败：",
+    "发送失败": "发送失败",
+
     # ---- AI 卡通 ----
     "准备中…": "准备中…",
     "处理中": "处理中",
@@ -725,6 +744,28 @@ EN = {
     "拼豆耗材清单.txt": "bead-list.txt",
     "拼豆耗材清单.xlsx": "bead-list.xlsx",
     "拼豆耗材清单": "Bead supply list",
+
+    # ---- 拼豆板（WS2812 串口导出）----
+    "导出拼豆板": "Send to Board",
+    "导出到拼豆板（WS2812）": "Send to Bead Board (WS2812)",
+    "把图纸发给 WS2812 拼豆板（STM32）": "Send the pattern to the WS2812 bead board (STM32)",
+    "图纸：%d × %d　共 %d 颗灯　点亮 %d 颗":
+        "Pattern: %d × %d, %d LEDs, %d lit",
+    "数据 %d 字节 · 每颗 3 字节(GRB) · 含校验":
+        "%d bytes · 3 bytes/LED (GRB) · with checksum",
+    "串口": "Port",
+    "波特率": "Baud",
+    "（未检测到串口）": "(no port detected)",
+    "提示：连接拼豆板后点「刷新」，选好串口再发送":
+        "Tip: connect the board, tap refresh, then pick a port",
+    "发送到拼豆板": "Send to Board",
+    "图纸数据打包失败，请重试。": "Failed to build the frame — please retry.",
+    "请先选择一个串口。": "Please select a serial port first.",
+    "正在发送到拼豆板…": "Sending to board…",
+    "已发送 %d 字节到 %s": "Sent %d bytes to %s",
+    "已发送到拼豆板 %s": "Sent to board %s",
+    "发送失败：": "Send failed: ",
+    "发送失败": "Send failed",
 
     # ---- AI 卡通 ----
     "准备中…": "Preparing…",
