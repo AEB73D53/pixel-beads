@@ -31,6 +31,15 @@
   .actions .btn { padding: 9px 16px; font-size: 13px; }
   #stats { margin-top: 12px; font-size: 13px; color: var(--ink-soft); white-space: pre-line; }
   a.logo { color:#fff; }
+  /* 手机端：左右两栏改上下堆叠，面板全宽，避免溢出 */
+  @media (max-width: 720px) {
+    .toolbar { flex-direction: column; }
+    #controls { width: 100%; }
+    #preview-box { min-width: 0; width: 100%; }
+    .actions { flex-direction: column; }
+    .actions .btn { width: 100%; }
+    .row { flex-wrap: wrap; }
+  }
 </style>
 </head>
 <body>

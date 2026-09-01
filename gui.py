@@ -372,6 +372,8 @@ class App(tk.Tk):
         self._last_path = None          # 最近打开图片（供“记住上次设置”）
         self._ai_key_var = tk.StringVar(value="")   # SenseNova API key（本地保存，不入源码）
         self._ai_cartoon_running = False
+        self._generating = False        # 生成进行中（防连点，线程内计算不卡界面）
+        self._board_busy = False        # 串口发送/测试进行中（防连点，避免串口重入）
 
         # 语言：启动时先读盘（不触发回调），读不到就默认中文
         L.load_lang_from_settings(_load_settings())
@@ -1687,97 +1689,140 @@ class App(tk.Tk):
         dlg.destroy()
 
     def generate(self):
-        if self.base is None:
+        """生成图纸：主线程快照参数，重计算（卡通化/网格化/映射/渲染）放后台线程。
 
+        避免大图时窗口卡死（Windows「未响应」）。进度与结果经 self.after(0, …)
+        回主线程更新——与 AI 卡通化线程同模式，但参数在此统一打包，worker 内
+        不直接读控件。
+        """
+        if self.base is None:
             messagebox.showinfo(APP_NAME, L.tr("请先打开一张图片。"))
             return
+        if self._generating:
+            return
+        try:
+            cols, rows, base = self._grid_size()
+        except Exception as e:
+            messagebox.showerror(APP_NAME, f"{L.tr('生成失败：')}{e}")
+            return
 
+        # —— 快照所有 UI 值（主线程读控件；worker 只拿这些副本计算）——
+        palette = self._find_palette(self.pal_var.get())
+        if palette is None:   # 所选色卡已被删除等异常情况
+            palette = palettes.get_all_palettes()[0]
+            self._refresh_palette_box(palette["name"])
+        mode_raw = self.mode.get()
+        args = {
+            "base": base, "cols": cols, "rows": rows, "palette": palette,
+            "max_colors": int(self.maxC.get()),
+            "bg_name": "白色" if self.bg_fill.get() else None,
+            "remove_alpha": self.remove_alpha,
+            "cartoon_enabled": self.cartoon_enabled.get(),
+            "cartoon_edge": int(self.cartoon_edge.get()),
+            "cartoon_smooth": int(self.cartoon_smooth.get()),
+            "mode_raw": mode_raw,
+        }
+        self._remember_settings()   # 生成即记住当前参数
+
+        self._generating = True
         self.prog.reset()
         self.prog.pack(fill=tk.X, pady=(0, 8))
         self.gen_btn.set_state(True)
         self.gen_btn.set_text(L.tr("生成中…"))
         self.update_idletasks()
+        threading.Thread(target=self._generate_worker, args=(args,),
+                         daemon=True).start()
 
+    def _generate_worker(self, args):
+        """后台线程：只做计算。进度经 after(0,…) 调度到主线程，完成后回调。"""
+        post = lambda fn: self.after(0, fn)
         try:
-            cols, rows, base = self._grid_size()
+            base = args["base"]
+            cols, rows, palette = args["cols"], args["rows"], args["palette"]
             # 阶段 0：卡通化（可选）
-            if self.cartoon_enabled.get():
-                edge = int(self.cartoon_edge.get())
-                smooth = int(self.cartoon_smooth.get())
-                self.status(L.tr("正在卡通化…"))
-                self.update_idletasks()
+            subject_found, subject_ratio = True, 1.0
+            if args["cartoon_enabled"]:
+                post(lambda: self.status(L.tr("正在卡通化…")))
                 cartoon, subject_found, subject_ratio = be.cartoonize(
-                    base, subject_detect=True, edge_size=edge, smooth_level=smooth)
-                if not subject_found:
-                    messagebox.showwarning(
-                        APP_NAME,
-                        "未检测到明显主体（主体只占画面 %.0f%%）。\n"
-                        "建议使用「手动框选」圈出主体，或换一张主体清晰的照片。"
-                        % (subject_ratio * 100))
+                    base, subject_detect=True, edge_size=args["cartoon_edge"],
+                    smooth_level=args["cartoon_smooth"])
                 base = cartoon.convert("RGBA")
-            self._remember_settings()   # 生成即记住当前参数
             # 阶段 1：网格化
-            self.prog.set_value(0, 0.0, label=self.prog.STAGES[0])
-            self.status(L.tr("正在网格化图片…"))
-            self.update_idletasks()
-            cells, bg_hex = be.grid_by_average(base, cols, rows,
-                                               keep_alpha=self.remove_alpha)
-            self.cached_cells = cells
-            self.prog.set_done(0)
-
+            post(lambda: self.prog.set_value(0, 0.0, label=self.prog.STAGES[0]))
+            post(lambda: self.status(L.tr("正在网格化图片…")))
+            cells, _bg_hex = be.grid_by_average(base, cols, rows,
+                                                keep_alpha=args["remove_alpha"])
+            post(lambda: self.prog.set_done(0))
             # 阶段 2：颜色映射
-            palette = self._find_palette(self.pal_var.get())
-            if palette is None:   # 所选色卡已被删除等异常情况
-                palette = palettes.get_all_palettes()[0]
-                self._refresh_palette_box(palette["name"])
-            bg_name = "白色" if self.bg_fill.get() else None
-            self.prog.set_value(1, 0.0, label=self.prog.STAGES[1])
-            self.status(L.tr("正在映射颜色到色卡…"))
-            self.update_idletasks()
+            post(lambda: self.prog.set_value(1, 0.0, label=self.prog.STAGES[1]))
+            post(lambda: self.status(L.tr("正在映射颜色到色卡…")))
             result, used = be.map_to_palette(cells, palette["colors"],
-                                             int(self.maxC.get()),
-                                             bg_overwrite=bg_name, image=base)
+                                             args["max_colors"],
+                                             bg_overwrite=args["bg_name"],
+                                             image=base)
             total = sum(c for _, _, c in used)
-            self.result, self.used_colors = result, used
-            self.grid_cols, self.grid_rows = cols, rows
-            self.prog.set_done(1)
-
+            post(lambda: self.prog.set_done(1))
             # 阶段 3：渲染预览
-            self.prog.set_value(2, 0.0, label=self.prog.STAGES[2])
-            self.status(L.tr("正在渲染预览…"))
-            self.update_idletasks()
-            self.highlight_color = None
-            self.done_cells = set()   # 新图纸，进度清零
-            self._done_items = []
-            self.color_preview = be.render_grid_preview(cells, result, cols, rows,
-                                                        cell_px=120, out_w=760)
-            self.number_preview = be.render_number_view(result, cols, rows, used,
-                                                        cell_px=36, margin=16)
-            self.showing_number = False
-            self.show_pil_right(self.color_preview)
-            # 单色分布条
-            self._build_swatches([(n, hx) for n, hx, _c in used])
-            self._swatch_open = False
-            self.swatch_canvas.pack_forget()
-            self.swatch_arrow.config(text="▶")
-            self.prog.set_done(2)
-            self.status(f"{L.tr('生成完成：')}{cols}x{rows}，{len(used)}{L.tr(' 种颜色，共 ')}{total}{L.tr(' 颗豆')}")
-            lines_txt = [f"{L.tr('图纸尺寸：')}{cols} x {rows}{L.tr('   用色：')}{len(used)}{L.tr(' 种   共需：')}{total}{L.tr(' 颗豆')}",
-                         "色卡：%s   模式：%s" % (self.pal_var.get(),
-                           self.mode.get().replace("auto", L.tr("自动去背景"))
-                           .replace("manual", L.tr("手动框选"))
-                           .replace("none", L.tr("不抠图")))]
-            if used:
-                top = used[:3]
-                lines_txt.append(L.tr("用豆最多：") +
-                                 "、".join(f"{n}({c})" for n, _, c in top))
-            self.stats_var.set("\n".join(lines_txt))
+            post(lambda: self.prog.set_value(2, 0.0, label=self.prog.STAGES[2]))
+            post(lambda: self.status(L.tr("正在渲染预览…")))
+            color_preview = be.render_grid_preview(cells, result, cols, rows,
+                                                   cell_px=120, out_w=760)
+            number_preview = be.render_number_view(result, cols, rows, used,
+                                                   cell_px=36, margin=16)
+            post(lambda: self.prog.set_done(2))
         except Exception as e:
+            post(lambda: self._generate_done(args, None, e))
+            return
+        post(lambda: self._generate_done(
+            args, (result, used, cells, cols, rows, total, color_preview,
+                   number_preview, subject_found, subject_ratio), None))
+
+    def _generate_done(self, args, payload, err):
+        """主线程收尾：写回结果、渲染画布、更新统计、恢复按钮。"""
+        self._generating = False
+        self.gen_btn.set_state(False)
+        self.gen_btn.set_text(L.tr("生 成 图 纸"))
+        if err is not None:
             self.prog.reset()
-            messagebox.showerror(APP_NAME, f"{L.tr('生成失败：')}{e}{L.tr('\\n\\n请调整参数后重试。')}")
-        finally:
-            self.gen_btn.set_state(False)
-            self.gen_btn.set_text(L.tr("生 成 图 纸"))
+            messagebox.showerror(
+                APP_NAME, f"{L.tr('生成失败：')}{err}{L.tr('\\n\\n请调整参数后重试。')}")
+            return
+        (result, used, cells, cols, rows, total,
+         color_preview, number_preview, subject_found, subject_ratio) = payload
+        self.result, self.used_colors = result, used
+        self.cached_cells = cells
+        self.grid_cols, self.grid_rows = cols, rows
+        self.highlight_color = None
+        self.done_cells = set()   # 新图纸，进度清零
+        self._done_items = []
+        self.color_preview = color_preview
+        self.number_preview = number_preview
+        self.showing_number = False
+        self.show_pil_right(self.color_preview)
+        # 单色分布条
+        self._build_swatches([(n, hx) for n, hx, _c in used])
+        self._swatch_open = False
+        self.swatch_canvas.pack_forget()
+        self.swatch_arrow.config(text="▶")
+        self.prog.set_done(2)
+        if not subject_found:
+            messagebox.showwarning(
+                APP_NAME,
+                "未检测到明显主体（主体只占画面 %.0f%%）。\n"
+                "建议使用「手动框选」圈出主体，或换一张主体清晰的照片。"
+                % (subject_ratio * 100))
+        self.status(f"{L.tr('生成完成：')}{cols}x{rows}，{len(used)}{L.tr(' 种颜色，共 ')}{total}{L.tr(' 颗豆')}")
+        mode_raw = args["mode_raw"]
+        lines_txt = [f"{L.tr('图纸尺寸：')}{cols} x {rows}{L.tr('   用色：')}{len(used)}{L.tr(' 种   共需：')}{total}{L.tr(' 颗豆')}",
+                     "色卡：%s   模式：%s" % (args["palette"]["name"],
+                       mode_raw.replace("auto", L.tr("自动去背景"))
+                       .replace("manual", L.tr("手动框选"))
+                       .replace("none", L.tr("不抠图")))]
+        if used:
+            top = used[:3]
+            lines_txt.append(L.tr("用豆最多：") +
+                             "、".join(f"{n}({c})" for n, _, c in top))
+        self.stats_var.set("\n".join(lines_txt))
 
     def toggle_view(self):
         if self.result is None:
@@ -2257,7 +2302,9 @@ class App(tk.Tk):
             self._board_port_var.set(L.tr("（未检测到串口）"))
 
     def _do_send_board(self, dlg, so, frame):
-        """真正把帧写到串口。"""
+        """真正把帧写到串口（放后台线程，串口阻塞不卡界面）。"""
+        if self._board_busy:
+            return
         raw_port = self._board_port_var.get().strip()
         # 去掉下拉里可能带上的描述（"COM3  描述文字" -> "COM3"）
         port = raw_port.split()[0] if raw_port else ""
@@ -2268,22 +2315,20 @@ class App(tk.Tk):
             baud = int(self._board_baud_var.get().strip())
         except Exception:
             baud = so.DEFAULT_BAUD
-        try:
-            self.status(L.tr("正在发送到拼豆板…"))
-            self.update_idletasks()
-            so.send_frame(frame, port, baud)
-            self.status(L.tr("已发送 %d 字节到 %s") % (len(frame), port))
-            messagebox.showinfo(APP_NAME, L.tr("已发送到拼豆板 %s") % port)
-            dlg.destroy()
-        except Exception as e:
-            self.status(L.tr("发送失败"))
-            messagebox.showerror(APP_NAME, f"{L.tr('发送失败：')}{e}")
+        self._board_busy = True
+        self.status(L.tr("正在发送到拼豆板…"))
+        self.update_idletasks()
+        threading.Thread(target=self._board_io_worker,
+                         args=(dlg, so, frame, port, baud, "send"),
+                         daemon=True).start()
 
     def _do_test_board(self, dlg, so):
         """测试灯板：发一个 1×1 白色测试帧，板子收到点亮 LED。
 
         用于不查看串口监视器、仅靠板子 LED 亮灭来验证链路通畅。
         """
+        if self._board_busy:
+            return
         raw_port = self._board_port_var.get().strip()
         port = raw_port.split()[0] if raw_port else ""
         if not port or "（" in raw_port:
@@ -2293,20 +2338,43 @@ class App(tk.Tk):
             baud = int(self._board_baud_var.get().strip())
         except Exception:
             baud = so.DEFAULT_BAUD
-        frame = so.build_test_frame()
+        self._board_busy = True
+        self.status(L.tr("测试灯板：发送中…"))
+        self.update_idletasks()
+        threading.Thread(target=self._board_io_worker,
+                         args=(dlg, so, so.build_test_frame(), port, baud, "test"),
+                         daemon=True).start()
+
+    def _board_io_worker(self, dlg, so, frame, port, baud, mode):
+        """后台线程：写串口，完成后 after(0, …) 回主线程弹结果框。"""
         try:
-            self.status(L.tr("测试灯板：发送中…"))
-            self.update_idletasks()
             so.send_frame(frame, port, baud)
+            err = None
+        except Exception as e:
+            err = e
+        self.after(0, lambda: self._board_io_done(dlg, port, mode, err))
+
+    def _board_io_done(self, dlg, port, mode, err):
+        """主线程收尾：更新状态、弹结果框、恢复可点。"""
+        self._board_busy = False
+        if err is not None:
+            self.status(L.tr("发送失败"))
+            messagebox.showerror(APP_NAME, f"{L.tr('发送失败：')}{err}")
+            return
+        if mode == "send":
+            self.status(L.tr("已发送到拼豆板 %s") % port)
+            messagebox.showinfo(APP_NAME, L.tr("已发送到拼豆板 %s") % port)
+            try:
+                dlg.destroy()
+            except Exception:
+                pass
+        else:
             self.status(L.tr("测试帧已发送到 %s") % port)
             messagebox.showinfo(
                 APP_NAME,
                 L.tr("测试帧已发送（1 颗白色）。板子应点亮 LED。\n\n"
                      "若 LED 亮了 → 链路正常；\n"
                      "若没亮 → 检查板子固件是否已烧录、串口是否正确。"))
-        except Exception as e:
-            self.status(L.tr("发送失败"))
-            messagebox.showerror(APP_NAME, f"{L.tr('发送失败：')}{e}")
 
     # ---------------------------------------------------------- 拼豆灵感
     def open_inspiration(self, page=0):
