@@ -312,6 +312,15 @@ ZH = {
     "已发送到拼豆板 %s": "已发送到拼豆板 %s",
     "发送失败：": "发送失败：",
     "发送失败": "发送失败",
+    "测试灯板": "测试灯板",
+    "测试灯板：发送中…": "测试灯板：发送中…",
+    "测试帧已发送到 %s": "测试帧已发送到 %s",
+    "测试帧已发送（1 颗白色）。板子应点亮 LED。\n\n"
+    "若 LED 亮了 → 链路正常；\n"
+    "若没亮 → 检查板子固件是否已烧录、串口是否正确。":
+    "测试帧已发送（1 颗白色）。板子应点亮 LED。\n\n"
+    "若 LED 亮了 → 链路正常；\n"
+    "若没亮 → 检查板子固件是否已烧录、串口是否正确。",
 
     # ---- AI 卡通 ----
     "准备中…": "准备中…",
@@ -766,6 +775,15 @@ EN = {
     "已发送到拼豆板 %s": "Sent to board %s",
     "发送失败：": "Send failed: ",
     "发送失败": "Send failed",
+    "测试灯板": "Test LED",
+    "测试灯板：发送中…": "Testing LED: sending…",
+    "测试帧已发送到 %s": "Test frame sent to %s",
+    "测试帧已发送（1 颗白色）。板子应点亮 LED。\n\n"
+    "若 LED 亮了 → 链路正常；\n"
+    "若没亮 → 检查板子固件是否已烧录、串口是否正确。":
+        "Test frame sent (1 white bead). The board should light its LED.\n\n"
+        "LED on → link is OK;\n"
+        "LED off → check firmware is flashed and the port is correct.",
 
     # ---- AI 卡通 ----
     "准备中…": "Preparing…",

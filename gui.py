@@ -2239,6 +2239,10 @@ class App(tk.Tk):
         RoundedButton(btn_row, L.tr("发送到拼豆板"), lambda: self._do_send_board(dlg, so, frame),
                       color="#2E8C83", fg="#FFFFFF", font=(FONT, 10, "bold")).pack(
                           side=tk.LEFT)
+        # 测试灯板：发一个 1×1 白色测试帧，板子收到后点亮 LED，用于无监视器验证链路
+        RoundedButton(btn_row, L.tr("测试灯板"), lambda: self._do_test_board(dlg, so),
+                      color="#B9842C", fg="#FFFFFF", font=(FONT, 10, "bold")).pack(
+                          side=tk.LEFT, padx=(10, 0))
         Chip(btn_row, L.tr("取消"), dlg.destroy, color=CARD, fg=INK_SOFT,
              font=(FONT, 9)).pack(side=tk.LEFT, padx=(10, 0))
 
@@ -2271,6 +2275,35 @@ class App(tk.Tk):
             self.status(L.tr("已发送 %d 字节到 %s") % (len(frame), port))
             messagebox.showinfo(APP_NAME, L.tr("已发送到拼豆板 %s") % port)
             dlg.destroy()
+        except Exception as e:
+            self.status(L.tr("发送失败"))
+            messagebox.showerror(APP_NAME, f"{L.tr('发送失败：')}{e}")
+
+    def _do_test_board(self, dlg, so):
+        """测试灯板：发一个 1×1 白色测试帧，板子收到点亮 LED。
+
+        用于不查看串口监视器、仅靠板子 LED 亮灭来验证链路通畅。
+        """
+        raw_port = self._board_port_var.get().strip()
+        port = raw_port.split()[0] if raw_port else ""
+        if not port or "（" in raw_port:
+            messagebox.showwarning(APP_NAME, L.tr("请先选择一个串口。"))
+            return
+        try:
+            baud = int(self._board_baud_var.get().strip())
+        except Exception:
+            baud = so.DEFAULT_BAUD
+        frame = so.build_test_frame()
+        try:
+            self.status(L.tr("测试灯板：发送中…"))
+            self.update_idletasks()
+            so.send_frame(frame, port, baud)
+            self.status(L.tr("测试帧已发送到 %s") % port)
+            messagebox.showinfo(
+                APP_NAME,
+                L.tr("测试帧已发送（1 颗白色）。板子应点亮 LED。\n\n"
+                     "若 LED 亮了 → 链路正常；\n"
+                     "若没亮 → 检查板子固件是否已烧录、串口是否正确。"))
         except Exception as e:
             self.status(L.tr("发送失败"))
             messagebox.showerror(APP_NAME, f"{L.tr('发送失败：')}{e}")

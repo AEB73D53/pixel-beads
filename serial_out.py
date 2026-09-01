@@ -73,6 +73,16 @@ def build_frame(cells, rows: int, cols: int) -> bytes:
     return bytes(frame)
 
 
+def build_test_frame() -> bytes:
+    """构造一个简单的「测试灯板」帧：1×1，一颗灯，亮白色 (255,255,255)。
+
+    用于在 PC 端点击「测试灯板」时，验证整条链路（exe 打包 → 串口发送 →
+    板子接收解析 → 点亮 LED）是否通畅，而不必查看串口监视器。
+    """
+    cells = [[("测试", "#FFFFFF")]]
+    return build_frame(cells, 1, 1)
+
+
 def frame_stats(frame: bytes) -> dict:
     """解析一帧并返回统计信息（用于预览 / 测试）。"""
     if len(frame) < 4:
